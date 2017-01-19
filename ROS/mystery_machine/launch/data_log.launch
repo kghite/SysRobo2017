@@ -1,0 +1,26 @@
+<launch>
+
+	<!-- Laser -->
+	<node pkg="hokuyo_node" type="hokuyo_node" name="hokuyo_node" args="/dev/ttyACM0" />
+
+	<!-- IMU -->
+	<node pkg="phidgets_imu" type="phidgets_imu_node" name="phidgets_imu_node"/>
+
+	<!-- GPS -->
+	<node pkg="nmea_navsat_driver" type="nmea_serial_driver" name="nmea_serial_driver">
+		<param name="_port" value="/dev/ttyACM2" />
+		<param name="_baud" value="115200" />
+	</node>
+
+	<!-- Camera -->
+	<node pkg="uvc_camera" type="uvc_camera_node" name="uvc_camera_node">
+		<param name="_device" value="/dev/video0"/>
+	</node>
+
+	<!-- Rosserial -->
+	<node pkg="rosserial_python" type="serial_node.py" name="serial_node" args="/dev/ttyACM1" />
+
+	<!-- Teleop -->
+	<node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py" name="teleop_twist_keyboard" />
+
+</launch>
