@@ -8,20 +8,25 @@
 
 
 // Inputs
-geometry_msgs::Twist wpt;
+geometry_msgs::Twist ang;
 
 // Outputs
-ros::Publisher pub_cmd_vel;
+ros::Publisher pub_arb;
+geometry_msgs::Twist msg;
+
 
 // Subscriber callbacks
 void getAngular(const geometry_msgs::Twist ang_vel) {
 	// Set global reference to angular message input
-	wpt = ang_vel;
+	ang = ang_vel;
 }
 
 void getLinear(const geometry_msgs::Twist lin_vel) {
 	// Compute combination of angular and linear inputs
+	msg.angular = ang.angular;
+	msg.linear = lin_vel.linear;
 }
+
 
 int main(int argc, char **argv)
 {
@@ -29,13 +34,13 @@ int main(int argc, char **argv)
   ros::NodeHandle n;
 
   // Subscribe to compass and gps data
-  ros::Subscriber sub_compass = n.subscribe("wpt/cmd_vel", 1000, getAngular);
-  ros::Subscriber sub_gps = n.subscribe("obst/cmd_vel", 1000, getLinear);
+  ros::Subscriber sub_ang = n.subscribe("ang/cmd_vel", 1000, getAngular);
+  ros::Subscriber sub_lin = n.subscribe("lin/cmd_vel", 1000, getLinear);
 
   // Publish final command velocity
-  pub_theta = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
+  pub_arb = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
-  pub_theta.publish(theta);
+  pub_arb.publish(msg);
 
   ros::spin();
 
