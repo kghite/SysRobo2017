@@ -1,4 +1,4 @@
-# FunRobo2016
+# RoboSys2017
 Code base for the Mystery Machine autonomous race vehicle
 
 ---
