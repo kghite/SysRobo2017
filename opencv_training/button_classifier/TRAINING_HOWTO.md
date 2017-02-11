@@ -72,8 +72,8 @@ Run the following command in the project directory after changing the parameters
 
 ```
 opencv_traincascade -data classifier -vec samples.vec -bg negatives.txt\
-  -numStages 20 -minHitRate 0.999 -maxFalseAlarmRate 0.5 -numPos 1000\
-  -numNeg 600 -w 80 -h 40 -mode ALL -precalcValBufSize 1024\
+  -numStages 20 -minHitRate 0.999 -maxFalseAlarmRate 0.5 -numPos 400\
+  -numNeg 600 -w 45 -h 80 -mode ALL -precalcValBufSize 1024\
   -precalcIdxBufSize 1024
 ```
 
