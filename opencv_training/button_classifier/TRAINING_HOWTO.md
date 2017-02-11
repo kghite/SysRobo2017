@@ -76,3 +76,7 @@ opencv_traincascade -data classifier -vec samples.vec -bg negatives.txt\
   -numNeg 600 -w 80 -h 40 -mode ALL -precalcValBufSize 1024\
   -precalcIdxBufSize 1024
 ```
+
+## Using the Result
+
+The trainer should output a .xml file with the classification data. Put this file in the python_scripts directory and update the detector script with the correct file name.
