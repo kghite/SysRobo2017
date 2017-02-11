@@ -16,19 +16,15 @@ sensor_msgs::LaserScan scan;
 ros::Publisher *pub_arb;
 geometry_msgs::Twist cmd_vel;
 
-// Calculate velocity
-std::vector<int> set_vel_vector(int object_weight, int lin)
-{
-  std::vector<int> vel(202, 0);
-  vel.at(lin+50) = object_weight;
-  return vel;
-}
+// Linear velocity delta
+int lin_vel = 0;
+
+// Speed limit
+float limit = 0.7;
 
 void controlSpeed(const sensor_msgs::LaserScan lidar_scan)
 {
-  // DEBUG
-  ROS_INFO("Received Scan");
-
+  ///// FILTER LIDAR SCANS /////
   // Assign LIDAR scan to global
   scan = lidar_scan;
 
@@ -44,19 +40,20 @@ void controlSpeed(const sensor_msgs::LaserScan lidar_scan)
     }
   }
 
-  // Calculate output array using some portion of scan
+  // Limit scan to range
   for (long i = number_of_ranges/3; i<2*number_of_ranges/3;i++)
   {
       if (forward_distance > scan.ranges[i] && scan.ranges[i] != 0)
           forward_distance = scan.ranges[i];
   }
 
+  ///// CALCULATE VELOCITY /////
   ROS_INFO("Forward distance: %lf", forward_distance);
   if (forward_distance < .3)
   {
     // Move backward
     ROS_INFO("Backward");
-    lin_vel = -5;
+    lin_vel = -0.1;
   }
   else if (forward_distance < .6)
   {
@@ -68,14 +65,20 @@ void controlSpeed(const sensor_msgs::LaserScan lidar_scan)
   {
     // Move forward
     ROS_INFO("Forward");
-    lin_vel = 5;
+    lin_vel = 0.1;
   }
 
-  // Define final_vel_command slider based on given lin_vel
-  final_vel_command = set_vel_vector(WALL, lin_vel);
+  // Linear vel
+  float linear_changed = cmd_vel.linear.y + lin_vel;
 
-  int* final_vel_arr = &final_vel_command[0];
-  cmd_vel.data.assign(final_vel_arr, final_vel_arr+202);
+  // Enforce speed limitation
+  if (linear_Changed > limit) {
+    cmd_vel.linear.y = limit;
+  }
+  // Increment or decrement cmd_vel
+  else {
+    cmd_vel.linear.y = linear_changed;
+  }
 
   pub_arb->publish(cmd_vel);
   cmd_vel.data.clear();
