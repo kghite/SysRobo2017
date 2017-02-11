@@ -7,23 +7,16 @@
 #include <vector>
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
-#include "std_msgs/Int8.h"
-#include "std_msgs/Int8MultiArray.h"
+#include "geometry_msgs/Twist"
 
-ros::Publisher *pub_arb;
+// Input
 sensor_msgs::LaserScan scan;
-std_msgs::Int8MultiArray cmd_array;
 
-// Speed to move forward with
-int lin_vel = 0;
+// Output
+ros::Publisher *pub_arb;
+geometry_msgs::Twist cmd_vel;
 
-// Final velocity slider
-std::vector<int> final_vel_command;
-
-// Object weights that get passed to the arbiter
-const int WALL = 1;
-
-// input lin from -50 to 50
+// Calculate velocity
 std::vector<int> set_vel_vector(int object_weight, int lin)
 {
   std::vector<int> vel(202, 0);
@@ -82,32 +75,24 @@ void controlSpeed(const sensor_msgs::LaserScan lidar_scan)
   final_vel_command = set_vel_vector(WALL, lin_vel);
 
   int* final_vel_arr = &final_vel_command[0];
-  cmd_array.data.assign(final_vel_arr, final_vel_arr+202);
+  cmd_vel.data.assign(final_vel_arr, final_vel_arr+202);
 
-  pub_arb->publish(cmd_array);
-  cmd_array.data.clear();
+  pub_arb->publish(cmd_vel);
+  cmd_vel.data.clear();
 
   // DEBUG
   ROS_INFO("Publishing Output");
-
 }
 
 int main(int argc, char **argv)
 {
-  // Define the final_vel_command slider based on given lin_vel
-  final_vel_command = set_vel_vector(WALL, lin_vel);
-
-  // Make an array copy of the final_vel_command slider vector
-  int* final_vel_arr = &final_vel_command[0];
-  cmd_array.data.assign(final_vel_arr, final_vel_arr+202);
-
   ros::init(argc, argv, "midbrain");
 
   ros::NodeHandle n;
 
   ros::Subscriber sub_imu = n.subscribe("/scan", 1000, controlSpeed);
 
-  pub_arb = new ros::Publisher(n.advertise<std_msgs::Int8MultiArray>("obst/cmd_vel", 1000));
+  pub_arb = new ros::Publisher(n.advertise<geometry_msgs::Twist>("obst/cmd_vel", 1000));
 
   ros::spin();
 
