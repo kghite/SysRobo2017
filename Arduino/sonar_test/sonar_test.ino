@@ -14,7 +14,7 @@ float distance; //variable to store computed distance
 
 
 void setup() {
-  sonarservo.attach(9);  // attaches the servo on pin 9 to the servo object
+  sonarservo.attach(36);  // attaches the servo on pin 9 to the servo object
   Serial.begin(9600); //start serial communication
 }
 

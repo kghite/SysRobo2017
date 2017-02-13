@@ -8,7 +8,7 @@
 //#include <known_16bit_timers.h>
 #include <Adafruit_TiCoServo.h>
 
-//Set up ports and pins to support robot
+const float pi = 3.14159;
 
 //Setup for all the neoPixels
 const byte LEFT_STRIP  = 3;
@@ -49,7 +49,7 @@ int current_angular_vel = 0;
 
 //Pins and servo objects for sonar sensor
 const byte SONAR_PIN = A7;
-const byte SONAR_PAN_PIN = 36;
+const byte SONAR_PAN_PIN = 44;
 
 Adafruit_TiCoServo sonar_pan_servo;
 
@@ -58,6 +58,7 @@ int sonar_pan_angle = 0;
 int time_of_last_sonar_pan = millis();
 int sonar_pan_interval = 50;
 int sonar_pan_increment = 1;
+float sonar_reading;
 
 //Define estop pin
 const byte ESTOP_PIN = 42;
@@ -65,7 +66,6 @@ const byte ESTOP_PIN = 42;
 //Define IR sensor variables
 const byte IR_PIN_1 = A0;
 const byte IR_PIN_2 = A1;
-//const int ir_high_threshold = 450;
 const int ir_low_threshold  = 300;
 int ir_estop = 0;
 
@@ -84,7 +84,6 @@ ros::Publisher sonar_data_publisher("sonar_data", &point_msg);
 //Various variables for ROS workings
 int odroid_estop = 0;
 String notification;
-
 
 //Define LIDAR tilt servo
 const byte LIDAR_TILT_PIN = 8;
@@ -162,9 +161,6 @@ void setup(){
   //Attach Servo objects to correct pins
   forward_channel.attach(FORWARD_PIN);
   turn_channel.attach(TURN_PIN);
-  
-  //Make sure the motors aren't moving
-  //update_drive_motors();
   
   //Initialize ROS topics
   nh.initNode();
@@ -252,17 +248,23 @@ void update_drive_motors(){
 }
 
 void update_sonar_pan_servo() {
-  Serial.println("updating sonar pan servo");
   // If the sonar pan servo has reached the end of a sweep, change direction
-  if (sonar_pan_increment == 0 || sonar_pan_increment == 180) {
+  if (sonar_pan_angle <= 0 || sonar_pan_angle >= 180) {
     sonar_pan_increment *= -1;
   }
   // If enough time has passed, move the sonar pan servo
-  if (millis() - time_of_last_sonar_pan > sonar_pan_interval) {
+  current_time = millis();
+  if (current_time - time_of_last_sonar_pan > sonar_pan_interval) {
+    Serial.println("updating sonar pan servo");
     sonar_pan_angle += sonar_pan_increment;
-    time_of_last_sonar_pan = millis();
     sonar_pan_servo.write(sonar_pan_angle);
+    time_of_last_sonar_pan = millis();
   }
+  sonar_reading = analogRead(SONAR_PIN);
+  point_msg.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
+  point_msg.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
+  point_msg.z = 0;
+  sonar_data_publisher.publish(&point_msg);
 }
 
 //See if we need to estop based on IR input
