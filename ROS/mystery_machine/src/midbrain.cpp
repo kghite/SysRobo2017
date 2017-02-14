@@ -7,7 +7,7 @@
 #include <vector>
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
-#include "geometry_msgs/Twist"
+#include "geometry_msgs/Twist.h"
 
 // Input
 sensor_msgs::LaserScan scan;
