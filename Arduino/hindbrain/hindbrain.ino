@@ -54,10 +54,10 @@ const byte SONAR_PAN_PIN = 44;
 Adafruit_TiCoServo sonar_pan_servo;
 
 //Variables for panning sonar servo
-int sonar_pan_angle = 0;
-int time_of_last_sonar_pan = millis();
-int sonar_pan_interval = 50;
-int sonar_pan_increment = 1;
+int sonar_pan_angle = 90;
+unsigned long time_of_last_sonar_pan = millis();
+int sonar_pan_time_interval = 50;
+int sonar_pan_angle_increment = 1;
 float sonar_reading;
 
 //Define estop pin
@@ -139,9 +139,6 @@ ros::Subscriber<std_msgs::Int16>odroid_estop_sub("odroid_estop",&odroidEstopCall
 
 //SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
 void setup(){
-  // Remove after testing
-  Serial.begin(9600);
-  
   //Setup all the NeoPixels
   left_strip.begin();
   right_strip.begin();
@@ -166,6 +163,7 @@ void setup(){
   nh.initNode();
   nh.advertise(chatter);
   nh.advertise(ir_estop_publisher);
+  nh.advertise(sonar_data_publisher);
   nh.subscribe(cmd_vel_sub);
   nh.subscribe(ir_estop_sub);
   nh.subscribe(odroid_estop_sub);
@@ -248,15 +246,24 @@ void update_drive_motors(){
 }
 
 void update_sonar_pan_servo() {
-  // If the sonar pan servo has reached the end of a sweep, change direction
-  if (sonar_pan_angle <= 0 || sonar_pan_angle >= 180) {
-    sonar_pan_increment *= -1;
-  }
+
   // If enough time has passed, move the sonar pan servo
   current_time = millis();
-  if (current_time - time_of_last_sonar_pan > sonar_pan_interval) {
-    Serial.println("updating sonar pan servo");
-    sonar_pan_angle += sonar_pan_increment;
+  if (current_time - time_of_last_sonar_pan > sonar_pan_time_interval) {
+    
+    sonar_pan_angle += sonar_pan_angle_increment;
+    
+    // If the sonar pan servo has reached the end of a sweep, change direction
+    if (sonar_pan_angle <= 0) {
+      sonar_pan_angle_increment = 1;
+      sonar_pan_angle = 0;
+    }
+    else if (sonar_pan_angle >= 180) {
+      sonar_pan_angle_increment = -1;
+      sonar_pan_angle = 180;
+    }
+
+    // Move the servo
     sonar_pan_servo.write(sonar_pan_angle);
     time_of_last_sonar_pan = millis();
   }
