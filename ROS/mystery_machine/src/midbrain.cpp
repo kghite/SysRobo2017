@@ -72,7 +72,7 @@ void controlSpeed(const sensor_msgs::LaserScan lidar_scan)
   float linear_changed = cmd_vel.linear.y + lin_vel;
 
   // Enforce speed limitation
-  if (linear_Changed > limit) {
+  if (linear_changed > limit) {
     cmd_vel.linear.y = limit;
   }
   // Increment or decrement cmd_vel
@@ -81,7 +81,6 @@ void controlSpeed(const sensor_msgs::LaserScan lidar_scan)
   }
 
   pub_arb->publish(cmd_vel);
-  cmd_vel.data.clear();
 
   // DEBUG
   ROS_INFO("Publishing Output");

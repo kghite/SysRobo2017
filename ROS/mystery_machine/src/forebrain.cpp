@@ -30,7 +30,7 @@ int main(int argc, char **argv)
 
   pub_arb = n.advertise<geometry_msgs::Twist>("wpt/cmd_vel", 1000);
 
-  pub_arb.publish(cmd_array);
+  pub_arb.publish(cmd_vel);
 
   ros::spin();
 
