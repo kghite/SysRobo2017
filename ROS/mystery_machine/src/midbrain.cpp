@@ -7,7 +7,7 @@
 #include <vector>
 #include "ros/ros.h"
 #include "sensor_msgs/LaserScan.h"
-#include "geometry_msgs/Twist"
+#include "geometry_msgs/Twist.h"
 
 // Input
 sensor_msgs::LaserScan scan;
@@ -81,7 +81,6 @@ void controlSpeed(const sensor_msgs::LaserScan lidar_scan)
   }
 
   pub_arb->publish(cmd_vel);
-  cmd_vel.data.clear();
 
   // DEBUG
   ROS_INFO("Publishing Output");
