@@ -3,12 +3,15 @@
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Int16.h>
+#include <std_msgs/Header.h>
 #include <geometry_msgs/Point.h>
+#include <geometry_msgs/PointStamped.h>
 
 //#include <known_16bit_timers.h>
 #include <Adafruit_TiCoServo.h>
 
 const float pi = 3.14159;
+const char *GLOBAL_FRAME = "1";
 
 //Setup for all the neoPixels
 const byte LEFT_STRIP  = 3;
@@ -59,6 +62,7 @@ unsigned long time_of_last_sonar_pan = millis();
 int sonar_pan_time_interval = 50;
 int sonar_pan_angle_increment = 1;
 float sonar_reading;
+int sonar_point_id = 0;
 
 //Define estop pin
 const byte ESTOP_PIN = 42;
@@ -78,7 +82,7 @@ ros::Publisher chatter("chatter", &str_msg);
 std_msgs::Int16 int_msg;
 ros::Publisher ir_estop_publisher("ir_estop", &int_msg);
 
-geometry_msgs::Point point_msg;
+geometry_msgs::PointStamped point_msg;
 ros::Publisher sonar_data_publisher("sonar_data", &point_msg);
 
 //Various variables for ROS workings
@@ -268,9 +272,14 @@ void update_sonar_pan_servo() {
     time_of_last_sonar_pan = millis();
   }
   sonar_reading = analogRead(SONAR_PIN);
-  point_msg.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
-  point_msg.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
-  point_msg.z = 0;
+  sonar_point_id ++;
+  point_msg.header.seq = sonar_point_id;
+  point_msg.header.stamp.sec = millis()/1000;
+  point_msg.header.stamp.nsec = (millis() - millis()/1000) * 1000;
+  point_msg.header.frame_id = GLOBAL_FRAME;
+  point_msg.point.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
+  point_msg.point.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
+  point_msg.point.z = 0;
   sonar_data_publisher.publish(&point_msg);
 }
 
