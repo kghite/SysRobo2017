@@ -3,11 +3,15 @@
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Int16.h>
+#include <std_msgs/Header.h>
+#include <geometry_msgs/Point.h>
+#include <geometry_msgs/PointStamped.h>
 
-#include <known_16bit_timers.h>
+//#include <known_16bit_timers.h>
 #include <Adafruit_TiCoServo.h>
 
-//Set up ports and pins to support robot
+const float pi = 3.14159;
+const char *GLOBAL_FRAME = "1";
 
 //Setup for all the neoPixels
 const byte LEFT_STRIP  = 3;
@@ -43,9 +47,22 @@ Adafruit_TiCoServo turn_channel;
 
 int linear_vel =  0;
 int angular_vel = 0;
-
 int current_linear_vel = 0;
 int current_angular_vel = 0;
+
+//Pins and servo objects for sonar sensor
+const byte SONAR_PIN = A7;
+const byte SONAR_PAN_PIN = 44;
+
+Adafruit_TiCoServo sonar_pan_servo;
+
+//Variables for panning sonar servo
+int sonar_pan_angle = 90;
+unsigned long time_of_last_sonar_pan = millis();
+int sonar_pan_time_interval = 50;
+int sonar_pan_angle_increment = 1;
+float sonar_reading;
+int sonar_point_id = 0;
 
 //Define estop pin
 const byte ESTOP_PIN = 42;
@@ -53,7 +70,6 @@ const byte ESTOP_PIN = 42;
 //Define IR sensor variables
 const byte IR_PIN_1 = A0;
 const byte IR_PIN_2 = A1;
-//const int ir_high_threshold = 450;
 const int ir_low_threshold  = 300;
 int ir_estop = 0;
 
@@ -64,16 +80,18 @@ std_msgs::String str_msg;
 ros::Publisher chatter("chatter", &str_msg);
 
 std_msgs::Int16 int_msg;
-ros::Publisher ir_estop_publisher("ir_estop",&int_msg);
+ros::Publisher ir_estop_publisher("ir_estop", &int_msg);
+
+geometry_msgs::PointStamped point_msg;
+ros::Publisher sonar_data_publisher("sonar_data", &point_msg);
 
 //Various variables for ROS workings
 int odroid_estop = 0;
 String notification;
 
-
 //Define LIDAR tilt servo
-const byte TILT_PIN = 8;
-Adafruit_TiCoServo tilt_servo;
+const byte LIDAR_TILT_PIN = 8;
+Adafruit_TiCoServo lidar_tilt_servo;
 const int middle_tilt_position = 110;
 int current_tilt_position = middle_tilt_position;
 
@@ -88,7 +106,7 @@ void twistCb( const geometry_msgs::Twist& twist_input ){
   angular_vel = int(90 * twist_input.angular.z);
   
   //Set motor speeds based on new command
-  //update_motors();
+  //update_drive_motors();
   
   //Print the received Twist message
   notification = "Received Twist message!\n";
@@ -145,13 +163,11 @@ void setup(){
   forward_channel.attach(FORWARD_PIN);
   turn_channel.attach(TURN_PIN);
   
-  //Make sure the motors aren't moving
-  //update_motors();
-  
   //Initialize ROS topics
   nh.initNode();
   nh.advertise(chatter);
   nh.advertise(ir_estop_publisher);
+  nh.advertise(sonar_data_publisher);
   nh.subscribe(cmd_vel_sub);
   nh.subscribe(ir_estop_sub);
   nh.subscribe(odroid_estop_sub);
@@ -160,17 +176,19 @@ void setup(){
   current_time = millis();
   blink_time   = millis();
   
-  pinMode(ESTOP_PIN,INPUT);
+  pinMode(ESTOP_PIN, INPUT);
+  pinMode(SONAR_PAN_PIN, INPUT);
   
-  tilt_servo.attach(TILT_PIN);
+  lidar_tilt_servo.attach(LIDAR_TILT_PIN);
+  sonar_pan_servo.attach(SONAR_PAN_PIN);
 }
 
 //Run hindbrain loop until commanded to stop LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL
 void loop(){
   //Read Midbrain commands
   
-  
   //Sense: Read robot sensors
+  //TODO - read sonar sensor and set sonar pan servo position
   
   //Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
   if(digitalRead(ESTOP_PIN))
@@ -185,9 +203,11 @@ void loop(){
   //Act: Run actuators and behavior lights
   blink();
   
-  //tilt_servo.write(current_tilt_position);
+  //lidar_tilt_servo.write(current_tilt_position);
   
-  update_motors();
+  update_drive_motors();
+  
+  update_sonar_pan_servo();
   
   //Write status data up to midbrain
   
@@ -197,7 +217,6 @@ void loop(){
 }
 
 // Hindbrain Helper Functions******************************************************************************
-
 //Writes a String message to the /chatter topic
 void chat(String message){
   char charBuf[100];
@@ -207,7 +226,7 @@ void chat(String message){
 }
 
 //Update motor speeds
-void update_motors(){
+void update_drive_motors(){
   //The ir_estop is the only estop the Arduino has to tell itself to stop via software
   if (ir_estop == 1 || odroid_estop == 1){
    forward_channel.write(90);
@@ -228,6 +247,40 @@ void update_motors(){
     else if (angular_vel < current_linear_vel)
       current_angular_vel -= 1;
   }
+}
+
+void update_sonar_pan_servo() {
+
+  // If enough time has passed, move the sonar pan servo
+  current_time = millis();
+  if (current_time - time_of_last_sonar_pan > sonar_pan_time_interval) {
+    
+    sonar_pan_angle += sonar_pan_angle_increment;
+    
+    // If the sonar pan servo has reached the end of a sweep, change direction
+    if (sonar_pan_angle <= 0) {
+      sonar_pan_angle_increment = 1;
+      sonar_pan_angle = 0;
+    }
+    else if (sonar_pan_angle >= 180) {
+      sonar_pan_angle_increment = -1;
+      sonar_pan_angle = 180;
+    }
+
+    // Move the servo
+    sonar_pan_servo.write(sonar_pan_angle);
+    time_of_last_sonar_pan = millis();
+  }
+  sonar_reading = analogRead(SONAR_PIN);
+  sonar_point_id ++;
+  point_msg.header.seq = sonar_point_id;
+  point_msg.header.stamp.sec = millis()/1000;
+  point_msg.header.stamp.nsec = (millis() * 1000) % 1000000;
+  point_msg.header.frame_id = GLOBAL_FRAME;
+  point_msg.point.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
+  point_msg.point.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
+  point_msg.point.z = 0;
+  sonar_data_publisher.publish(&point_msg);
 }
 
 //See if we need to estop based on IR input
@@ -255,7 +308,6 @@ void check_ir_sensors(){
         ir_estop_publisher.publish(&int_msg);
       }
     }
-    
     
   }
   else{
