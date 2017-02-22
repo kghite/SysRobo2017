@@ -3,17 +3,17 @@
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Int16.h>
+#include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Header.h>
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PointStamped.h>
-
-//#include <known_16bit_timers.h>
 #include <Adafruit_TiCoServo.h>
 
+// Global constants
 const float pi = 3.14159;
 const char *GLOBAL_FRAME = "1";
 
-//Setup for all the neoPixels
+// Setup for all the neoPixels
 const byte LEFT_STRIP  = 3;
 const byte RIGHT_STRIP = 2;
 const byte LEFT_RING   = 5;
@@ -31,14 +31,14 @@ uint32_t off   = left_strip.Color(0,0,0,0);
 uint32_t blue  = left_strip.Color(0,64,255,0);
 uint32_t purple= left_strip.Color(255,0,255,0);
 
-//Variables for blink timing.
+// Variables for blink timing
 unsigned long current_time;
 unsigned long blink_time;
 byte blinked = 0;
-int delay_period = 500; //Blinking speed for alive light
-char command = 'g'; //Command from midbrain
+int delay_period = 500; // Blinking speed for alive light
+char command = 'g'; // Command from midbrain
 
-//Pins and servo objects for Roboclaw control
+// Pins and servo objects for Roboclaw control
 const byte FORWARD_PIN = 6;
 const byte TURN_PIN = 7;
 
@@ -50,13 +50,13 @@ int angular_vel = 0;
 int current_linear_vel = 0;
 int current_angular_vel = 0;
 
-//Pins and servo objects for sonar sensor
+// Pins and servo objects for sonar sensor
 const byte SONAR_PIN = A7;
 const byte SONAR_PAN_PIN = 44;
 
 Adafruit_TiCoServo sonar_pan_servo;
 
-//Variables for panning sonar servo
+// Variables for panning sonar servo
 int sonar_pan_angle = 90;
 unsigned long time_of_last_sonar_pan = millis();
 int sonar_pan_time_interval = 50;
@@ -64,51 +64,68 @@ int sonar_pan_angle_increment = 1;
 float sonar_reading;
 int sonar_point_id = 0;
 
-//Define estop pin
+// Define estop pin
 const byte ESTOP_PIN = 42;
 
-//Define IR sensor variables
+// Define IR sensor variables
 const byte IR_PIN_1 = A0;
 const byte IR_PIN_2 = A1;
 const int ir_low_threshold  = 300;
 int ir_estop = 0;
 
-//Set up ROS node handling and feedback channel
+// Motor encoders
+int left_encoder_pin_A = 14;
+int left_encoder_pin_B = 15;
+int left_encoder_A_curr_val = LOW;
+int left_encoder_A_prev_val = LOW;
+int left_encoder_B_curr_val = LOW;
+int left_encoder_pos = 0;
+int right_encoder_pin_A = 16;
+int right_encoder_pin_B = 17;
+int right_encoder_A_curr_val = LOW;
+int right_encoder_A_prev_val = LOW;
+int right_encoder_B_curr_val = LOW;
+int right_encoder_pos = 0;
+
+// Set up ROS node handling and feedback channel
 ros::NodeHandle nh;
 
-std_msgs::String str_msg;
-ros::Publisher chatter("chatter", &str_msg);
+std_msgs::String chatter_msg;
+ros::Publisher chatter_publisher("chatter", &chatter_msg);
 
-std_msgs::Int16 int_msg;
-ros::Publisher ir_estop_publisher("ir_estop", &int_msg);
+std_msgs::Int16 ir_estop_msg;
+ros::Publisher ir_estop_publisher("ir_estop", &ir_estop_msg);
 
-geometry_msgs::PointStamped point_msg;
-ros::Publisher sonar_data_publisher("sonar_data", &point_msg);
+geometry_msgs::PointStamped sonar_data_msg;
+ros::Publisher sonar_data_publisher("sonar_data", &sonar_data_msg);
 
-//Various variables for ROS workings
+std_msgs::Int32MultiArray encoder_data_msg;
+ros::Publisher encoder_data_publisher("encoder_data", &encoder_data_msg);
+
+// Various variables for ROS workings
 int odroid_estop = 0;
 String notification;
 
-//Define LIDAR tilt servo
+// Define LIDAR tilt servo
 const byte LIDAR_TILT_PIN = 8;
 Adafruit_TiCoServo lidar_tilt_servo;
 const int middle_tilt_position = 110;
 int current_tilt_position = middle_tilt_position;
 
-//Callback function for a Twist message TCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCb
+// Callback function for a Twist message TCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCb
 void twistCb( const geometry_msgs::Twist& twist_input ){
   
-  //Extract velocity data
-  //Multiply by 90 to maintain resolution
-  //Ends up giving a signal for write between 0-180
-  //Make sure cmd_vel has values that range -1 to 1
+  // Extract velocity data
+  // Multiply by 90 to maintain resolution
+  // Ends up giving a signal for write between 0-180
+  // Make sure cmd_vel has values that range -1 to 1
   linear_vel  = int(90 * twist_input.linear.x);
   angular_vel = int(90 * twist_input.angular.z);
   
-  //Set motor speeds based on new command
-  //update_drive_motors();
+  // Set motor speeds based on new command
+  // update_drive_motors();
   
-  //Print the received Twist message
+  // Print the received Twist message
   notification = "Received Twist message!\n";
   notification += "Linear vel: " + String(linear_vel) + "\n";
   notification += "Angular vel: " + String(angular_vel);
@@ -118,9 +135,9 @@ void twistCb( const geometry_msgs::Twist& twist_input ){
 
 ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("cmd_vel", &twistCb );
 
-//Callback function for an IR Estop message IRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCb
+// Callback function for an IR Estop message IRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCb
 void irEstopCallback( const std_msgs::Int16& int_input ){
-  //Check and see if the midbrain says it's okay to move
+  // Check and see if the midbrain says it's okay to move
   int estop_message = int_input.data;
   
   if (estop_message == 2){
@@ -131,9 +148,9 @@ void irEstopCallback( const std_msgs::Int16& int_input ){
 
 ros::Subscriber<std_msgs::Int16>ir_estop_sub("ir_estop",&irEstopCallback);
 
-//Callback function for an Odroid Estop message OCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcb
+// Callback function for an Odroid Estop message OCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcb
 void odroidEstopCallback( const std_msgs::Int16& int_input ){
-  //Just update this estop.. Pretty easy
+  // Just update this estop.. Pretty easy
   int estop_message = int_input.data;
   
   odroid_estop = estop_message;
@@ -141,9 +158,13 @@ void odroidEstopCallback( const std_msgs::Int16& int_input ){
 
 ros::Subscriber<std_msgs::Int16>odroid_estop_sub("odroid_estop",&odroidEstopCallback);
 
-//SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
+// SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
 void setup(){
-  //Setup all the NeoPixels
+  // Initialize timing things
+  current_time = millis();
+  blink_time   = millis();
+  
+  // Setup all the NeoPixels
   left_strip.begin();
   right_strip.begin();
   left_ring.begin();
@@ -159,75 +180,112 @@ void setup(){
   left_ring.setBrightness(16);
   right_ring.setBrightness(16);
   
-  //Attach Servo objects to correct pins
+  // Define pin modes
+  pinMode(ESTOP_PIN, INPUT);
+  pinMode(SONAR_PAN_PIN, INPUT);
+  pinMode(left_encoder_pin_A, INPUT);
+  pinMode(left_encoder_pin_B, INPUT);
+  pinMode(right_encoder_pin_A, INPUT);
+  pinMode(right_encoder_pin_B, INPUT);
+  
+  // Attach Servo objects to correct pins
   forward_channel.attach(FORWARD_PIN);
   turn_channel.attach(TURN_PIN);
+  lidar_tilt_servo.attach(LIDAR_TILT_PIN);
+  sonar_pan_servo.attach(SONAR_PAN_PIN);
   
-  //Initialize ROS topics
+  // Initialize ROS topics
   nh.initNode();
-  nh.advertise(chatter);
+  nh.advertise(chatter_publisher);
   nh.advertise(ir_estop_publisher);
   nh.advertise(sonar_data_publisher);
+  nh.advertise(encoder_data_publisher);
   nh.subscribe(cmd_vel_sub);
   nh.subscribe(ir_estop_sub);
   nh.subscribe(odroid_estop_sub);
-  
-  //Initialize timing things
-  current_time = millis();
-  blink_time   = millis();
-  
-  pinMode(ESTOP_PIN, INPUT);
-  pinMode(SONAR_PAN_PIN, INPUT);
-  
-  lidar_tilt_servo.attach(LIDAR_TILT_PIN);
-  sonar_pan_servo.attach(SONAR_PAN_PIN);
 }
 
-//Run hindbrain loop until commanded to stop LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL
-void loop(){
-  //Read Midbrain commands
+// Run hindbrain loop until commanded to stop LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL
+void loop() {
+  // Read Midbrain commands
   
-  //Sense: Read robot sensors
-  //TODO - read sonar sensor and set sonar pan servo position
+  // Sense: Read robot sensors
+  read_encoders();
+  update_pan_and_read_sonar();
   
-  //Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+  // Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
   if(digitalRead(ESTOP_PIN))
     delay_period = 500;
   else{
     delay_period = 150;
-    //chat("Physical estop pressed");
+    // chat("Physical estop pressed");
   }
   
   check_ir_sensors();
   
-  //Act: Run actuators and behavior lights
+  // Act: Run actuators and behavior lights
   blink();
   
-  //lidar_tilt_servo.write(current_tilt_position);
+  // lidar_tilt_servo.write(current_tilt_position);
   
-  update_drive_motors();
+  update_drive_motors();  
   
-  update_sonar_pan_servo();
+  // Write status data up to midbrain
   
-  //Write status data up to midbrain
-  
-  //Spin!
+  // Spin!
   nh.spinOnce();
   delay(1);
 }
 
 // Hindbrain Helper Functions******************************************************************************
-//Writes a String message to the /chatter topic
-void chat(String message){
+// Writes a String message to the /chatter topic
+void chat(String message) {
   char charBuf[100];
   message.toCharArray(charBuf,100);    
-  str_msg.data = charBuf;
-  chatter.publish( &str_msg );
+  chatter_msg.data = charBuf;
+  chatter_publisher.publish( &chatter_msg );
 }
 
-//Update motor speeds
+// Read left and right motor encoders and update values
+void read_encoders() {
+  left_encoder_A_curr_val = digitalRead(left_encoder_pin_A);
+  left_encoder_B_curr_val = digitalRead(left_encoder_pin_B);
+  right_encoder_A_curr_val = digitalRead(right_encoder_pin_A);
+  right_encoder_B_curr_val = digitalRead(right_encoder_pin_B);
+  
+  // If left encoder channel A has gone from low to high
+  if (left_encoder_A_prev_val == LOW && left_encoder_A_curr_val == HIGH) {
+    if (left_encoder_B_curr_val == LOW) {
+      left_encoder_pos--;
+    }
+    else {
+      left_encoder_pos++;
+    }
+  }
+  
+  // If right encoder channel A has gone from low to high
+  if (right_encoder_A_prev_val == LOW && right_encoder_A_curr_val == HIGH) {
+    if (right_encoder_B_curr_val == LOW) {
+      right_encoder_pos--;
+    }
+    else {
+      right_encoder_pos++;
+    }
+  }
+
+  // Update previous encoder values for next loop
+  left_encoder_A_prev_val = left_encoder_A_curr_val;
+  right_encoder_A_prev_val = right_encoder_A_curr_val;
+  
+  // Publisher encoder data
+  encoder_data_msg.data[0] = left_encoder_pos;
+  encoder_data_msg.data[1] = right_encoder_pos;
+  encoder_data_publisher.publish(&encoder_data_msg);
+}
+
+// Update motor speeds
 void update_drive_motors(){
-  //The ir_estop is the only estop the Arduino has to tell itself to stop via software
+  // The ir_estop is the only estop the Arduino has to tell itself to stop via software
   if (ir_estop == 1 || odroid_estop == 1){
    forward_channel.write(90);
     turn_channel.write(90);
@@ -249,7 +307,7 @@ void update_drive_motors(){
   }
 }
 
-void update_sonar_pan_servo() {
+void update_pan_and_read_sonar() {
 
   // If enough time has passed, move the sonar pan servo
   current_time = millis();
@@ -273,17 +331,17 @@ void update_sonar_pan_servo() {
   }
   sonar_reading = analogRead(SONAR_PIN);
   sonar_point_id ++;
-  point_msg.header.seq = sonar_point_id;
-  point_msg.header.stamp.sec = millis()/1000;
-  point_msg.header.stamp.nsec = (millis() * 1000) % 1000000;
-  point_msg.header.frame_id = GLOBAL_FRAME;
-  point_msg.point.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
-  point_msg.point.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
-  point_msg.point.z = 0;
-  sonar_data_publisher.publish(&point_msg);
+  sonar_data_msg.header.seq = sonar_point_id;
+  sonar_data_msg.header.stamp.sec = millis()/1000;
+  sonar_data_msg.header.stamp.nsec = (millis() * 1000) % 1000000;
+  sonar_data_msg.header.frame_id = GLOBAL_FRAME;
+  sonar_data_msg.point.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
+  sonar_data_msg.point.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
+  sonar_data_msg.point.z = 0;
+  sonar_data_publisher.publish(&sonar_data_msg);
 }
 
-//See if we need to estop based on IR input
+// See if we need to estop based on IR input
 void check_ir_sensors(){
   int ir_reading_1;
   int ir_reading_2;
@@ -296,16 +354,16 @@ void check_ir_sensors(){
   if (ir_reading_1 < ir_low_threshold || ir_reading_2 < ir_low_threshold){
     if (ir_estop == 0){
       ir_estop = 1;
-      int_msg.data = ir_estop;
-      ir_estop_publisher.publish(&int_msg);
+      ir_estop_msg.data = ir_estop;
+      ir_estop_publisher.publish(&ir_estop_msg);
     }
     
     else if (ir_estop == 2){
       
       if (linear_vel > 0){
         ir_estop = 1;
-        int_msg.data = ir_estop;
-        ir_estop_publisher.publish(&int_msg);
+        ir_estop_msg.data = ir_estop;
+        ir_estop_publisher.publish(&ir_estop_msg);
       }
     }
     
@@ -313,20 +371,20 @@ void check_ir_sensors(){
   else{
     if (ir_estop != 0){
       ir_estop = 0;
-      int_msg.data = ir_estop;
-      ir_estop_publisher.publish(&int_msg);
+      ir_estop_msg.data = ir_estop;
+      ir_estop_publisher.publish(&ir_estop_msg);
     }
   }
 }
 
-//Blink all NeoPixels on and off
+// Blink all NeoPixels on and off
 void blink(){
   current_time = millis();
   
   if(current_time - blink_time > delay_period){
     blinked = !blinked;
     
-    //Logic to do turning/stopped lights
+    // Logic to do turning/stopped lights
     if(blinked){
       if (linear_vel == 0 && angular_vel == 0 && ir_estop == 1)
         change_all_colors(purple);
@@ -334,13 +392,13 @@ void blink(){
         change_all_colors(red);
       else if (ir_estop == 1)
         change_all_colors(blue);
-      else if (angular_vel < -3){ //turning left
+      else if (angular_vel < -3){ // turning left
         if(linear_vel>=0)
           change_left_colors(white);
         else
           change_left_colors(yellow);
       }
-      else if (angular_vel > 3){ //turning right
+      else if (angular_vel > 3){ // turning right
         if(linear_vel>=0)
           change_right_colors(white);
         else
@@ -356,11 +414,9 @@ void blink(){
     
     blink_time = millis();
   }
-  
-  
 }
 
-//Helper function to make all NeoPixels a given color
+// Helper function to make all NeoPixels a given color
 void change_all_colors(uint32_t color){
   for (int i = 0; i < 8; i++)
   {
@@ -378,7 +434,7 @@ void change_all_colors(uint32_t color){
   right_ring.show();
 }
 
-//Helper functions for right and left banks of lights
+// Helper functions for right and left banks of lights
 void change_left_colors(uint32_t color){
   for (int i = 0; i < 8; i++)
   {
@@ -411,4 +467,4 @@ void change_right_colors(uint32_t color){
   right_strip.show();
   left_ring.show();
   right_ring.show();
-} 
+}
