@@ -12,7 +12,7 @@ int main(int argc, char** argv){
   while(n.ok()){
     broadcaster.sendTransform(
       tf::StampedTransform(
-        tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0.0, -0.1270, 0.0635)),
+        tf::Transform(tf::Quaternion(0, 0, 100, 1), tf::Vector3(0.0, -0.1270, 0.0635)),
         ros::Time::now(),"base_link", "base_sonar"));
     r.sleep();
   }

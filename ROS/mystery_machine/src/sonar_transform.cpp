@@ -44,14 +44,14 @@ int main(int argc, char** argv){
   ros::init(argc, argv, "sonar_transform");
   ros::NodeHandle n;
 
-  ros::Subscriber sub_ang = n.subscribe("sonar_data", 500, getSonar);
+  ros::Subscriber sub_ang = n.subscribe("sonar_data", 50, getSonar);
 
   tf::TransformListener listener(ros::Duration(10));
 
   //we'll transform a point once every second
   ros::Timer timer = n.createTimer(ros::Duration(0.5), boost::bind(&transformPoint, boost::ref(listener)));
 
-  pub = new ros::Publisher(n.advertise<geometry_msgs::PointStamped>("sonar_transformed", 500));
+  pub = new ros::Publisher(n.advertise<geometry_msgs::PointStamped>("sonar_transformed", 50));
 
   ros::spin();
 

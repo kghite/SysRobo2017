@@ -15,7 +15,7 @@
 	<node pkg="mystery_machine" type="sonar_transform" name="sonar_transform" />
 
 	<!-- Fake Lidar Transform for rviz -->
-	<node pkg="tf" type="static_transform_publisher" name="laser" args="0 -0.3302 -0.0889 1.5707 0 0 /base_link /laser  100" />
+	<node pkg="tf" type="static_transform_publisher" name="laser" args="0 -0.3302 -0.0889 -1.5707 0 0 /base_link /laser  100" />
 
 	<!-- Rosserial -->
 	<node pkg="rosserial_python" type="serial_node.py" name="serial_node" args="/dev/ttyACM1" />
