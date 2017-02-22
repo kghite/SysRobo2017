@@ -1,7 +1,9 @@
 <launch>
 
 	<!-- Lidar -->
-	<node pkg="hokuyo_node" type="hokuyo_node" name="hokuyo_node" args="/dev/ttyACM2" />
+	<node pkg="hokuyo_node" type="hokuyo_node" name="hokuyo_node" >
+            <param name="port" value="/dev/ttyACM3" />
+        </node>
 
 	<!-- Lidar Transform -->
 	<node pkg="mystery_machine" type="lidar_tf_publisher" name="lidar_tf_publisher" />
@@ -13,6 +15,6 @@
 	<node pkg="mystery_machine" type="sonar_transform" name="sonar_transform" />
 
 	<!-- Rosserial -->
-	<node pkg="rosserial_python" type="serial_node.py" name="serial_node" args="/dev/ttyACM0" />
+	<node pkg="rosserial_python" type="serial_node.py" name="serial_node" args="/dev/ttyACM2" />
 
 </launch>

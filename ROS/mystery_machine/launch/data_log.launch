@@ -1,7 +1,7 @@
 <launch>
 
 	<!-- Laser -->
-	<node pkg="hokuyo_node" type="hokuyo_node" name="hokuyo_node" args="/dev/ttyACM0" />
+	<node pkg="hokuyo_node" type="hokuyo_node" name="hokuyo_node" args="/dev/ttyACM3" />
 
 	<!-- IMU -->
 	<node pkg="phidgets_imu" type="phidgets_imu_node" name="phidgets_imu_node"/>
