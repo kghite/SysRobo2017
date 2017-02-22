@@ -275,7 +275,7 @@ void update_sonar_pan_servo() {
   sonar_point_id ++;
   point_msg.header.seq = sonar_point_id;
   point_msg.header.stamp.sec = millis()/1000;
-  point_msg.header.stamp.nsec = (millis() - millis()/1000) * 1000;
+  point_msg.header.stamp.nsec = (millis() * 1000) % 1000000;
   point_msg.header.frame_id = GLOBAL_FRAME;
   point_msg.point.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
   point_msg.point.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
