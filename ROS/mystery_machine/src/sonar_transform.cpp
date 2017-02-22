@@ -6,7 +6,7 @@
 #include <tf/transform_listener.h>
 
 geometry_msgs::PointStamped sonar_point;
-ros::Publisher pub;
+ros::Publisher *pub;
 
 // Subscriber callback for sonar
 void getSonar(const geometry_msgs::PointStamped sonar) {
@@ -15,7 +15,14 @@ void getSonar(const geometry_msgs::PointStamped sonar) {
 }
 
 void transformPoint(const tf::TransformListener& listener){
+ ROS_INFO("base_sonar: (%.2f, %.2f. %.2f)",
+        sonar_point.point.x, sonar_point.point.y, sonar_point.point.z);
+
   sonar_point.header.frame_id = "base_sonar";
+  sonar_point.header.stamp = ros::Time();
+  sonar_point.point.x = sonar_point.point.x / 100;
+  sonar_point.point.y = sonar_point.point.y / 100;
+  sonar_point.point.z = sonar_point.point.z / 100;
 
   try{
     geometry_msgs::PointStamped base_point;
@@ -25,7 +32,7 @@ void transformPoint(const tf::TransformListener& listener){
         sonar_point.point.x, sonar_point.point.y, sonar_point.point.z,
         base_point.point.x, base_point.point.y, base_point.point.z, base_point.header.stamp.toSec());
   
-    pub_arb->publish(sonar_point);
+    pub->publish(base_point);
   }
   catch(tf::TransformException& ex){
     ROS_ERROR("Received an exception trying to transform a point from \"base_sonar\" to \"base_link\": %s", ex.what());
@@ -37,14 +44,14 @@ int main(int argc, char** argv){
   ros::init(argc, argv, "sonar_transform");
   ros::NodeHandle n;
 
-  ros::Subscriber sub_ang = n.subscribe("ang/cmd_vel", 500, getSonar);
+  ros::Subscriber sub_ang = n.subscribe("sonar_data", 500, getSonar);
 
   tf::TransformListener listener(ros::Duration(10));
 
   //we'll transform a point once every second
   ros::Timer timer = n.createTimer(ros::Duration(0.5), boost::bind(&transformPoint, boost::ref(listener)));
 
-  pub = n.advertise<geometry_msgs::PointStamped>("/sonar_transformed", 500);
+  pub = new ros::Publisher(n.advertise<geometry_msgs::PointStamped>("sonar_transformed", 500));
 
   ros::spin();
 
