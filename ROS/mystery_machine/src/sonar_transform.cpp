@@ -45,7 +45,7 @@ int main(int argc, char** argv){
   //we'll transform a point once every second
   ros::Timer timer = n.createTimer(ros::Duration(0.5), boost::bind(&transformPoint, boost::ref(listener)));
 
-  pub_arb = n.advertise<geometry_msgs::PointStamped>("/sonar_transformed", 500);
+  pub = n.advertise<geometry_msgs::PointStamped>("/sonar_transformed", 500);
 
   pub.publish(sonar_transformed);
 
