@@ -49,7 +49,7 @@ The funrobo_robot and phiget_drivers directories are independent git repositorie
 
 ### SSH Into the ODROID
 
-`ssh odroid@192.168.16.68`
+`ssh odroid@192.168.16.83`
 
 ### Teleop Mode
 
