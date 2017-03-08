@@ -6,7 +6,7 @@
 long _PreviousLeftEncoderCounts = 0;
 long _PreviousRightEncoderCounts = 0;
 ros::Time current_time_encoder, last_time_encoder;
-double DistancePerCount = (3.14159265 * 0.1524) / 64000;
+double DistancePerCount = (3.14159265 * 0.1524) / 165;
 double LengthBetweenTwoWheels = 0.25;
 
 double x;

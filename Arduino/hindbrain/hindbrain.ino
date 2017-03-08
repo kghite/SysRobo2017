@@ -10,6 +10,8 @@
 #include <geometry_msgs/PointStamped.h>
 #include <Adafruit_TiCoServo.h>
 
+#define USB_CON
+
 // Global constants
 const float pi = 3.14159;
 const char *GLOBAL_FRAME = "1";
@@ -75,14 +77,14 @@ const int ir_low_threshold  = 300;
 int ir_estop = 0;
 
 // Motor encoders
-int left_encoder_pin_A = 24;
-int left_encoder_pin_B = 25;
+int left_encoder_pin_A = 23;
+int left_encoder_pin_B = 22;
 int left_encoder_A_curr_val = LOW;
 int left_encoder_A_prev_val = LOW;
 int left_encoder_B_curr_val = LOW;
 int left_encoder_pos = 0;
-int right_encoder_pin_A = 22;
-int right_encoder_pin_B = 23;
+int right_encoder_pin_A = 25;
+int right_encoder_pin_B = 24;
 int right_encoder_A_curr_val = LOW;
 int right_encoder_A_prev_val = LOW;
 int right_encoder_B_curr_val = LOW;
@@ -100,8 +102,8 @@ ros::Publisher ir_estop_publisher("ir_estop", &ir_estop_msg);
 geometry_msgs::PointStamped sonar_data_msg;
 ros::Publisher sonar_data_publisher("sonar_data", &sonar_data_msg);
 
-std_msgs::Int32MultiArray encoder_data_msg;
-ros::Publisher encoder_data_publisher("encoder_data", &encoder_data_msg);
+//std_msgs::Int32MultiArray encoder_data_msg;
+//ros::Publisher encoder_data_publisher("encoder_data", &encoder_data_msg);
 
 std_msgs::Int32 encoder_left_msg;
 ros::Publisher encoder_left_publisher("encoder_left", &encoder_left_msg);
@@ -206,7 +208,9 @@ void setup(){
   nh.advertise(chatter_publisher);
   nh.advertise(ir_estop_publisher);
   nh.advertise(sonar_data_publisher);
-  nh.advertise(encoder_data_publisher);
+  //nh.advertise(encoder_data_publisher);
+  nh.advertise(encoder_left_publisher);
+  nh.advertise(encoder_right_publisher);
   nh.subscribe(cmd_vel_sub);
   nh.subscribe(ir_estop_sub);
   nh.subscribe(odroid_estop_sub);
@@ -290,10 +294,10 @@ void read_encoders() {
   encoder_left_publisher.publish(&encoder_left_msg);
   encoder_right_publisher.publish(&encoder_right_msg);
   
-  // Publisher encoder data
-  encoder_data_msg.data[0] = left_encoder_pos;
-  encoder_data_msg.data[1] = right_encoder_pos;
-  encoder_data_publisher.publish(&encoder_data_msg);
+//  // Publisher encoder data
+//  encoder_data_msg.data[0] = left_encoder_pos;
+//  encoder_data_msg.data[1] = right_encoder_pos;
+//  encoder_data_publisher.publish(&encoder_data_msg);
 }
 
 // Update motor speeds
