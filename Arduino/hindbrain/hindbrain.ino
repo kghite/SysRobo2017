@@ -52,7 +52,7 @@ int current_angular_vel = 0;
 
 // Pins and servo objects for sonar sensor
 const byte SONAR_PIN = A7;
-const byte SONAR_PAN_PIN = 44;
+const byte SONAR_PAN_PIN = 36;
 
 Adafruit_TiCoServo sonar_pan_servo;
 
@@ -74,14 +74,14 @@ const int ir_low_threshold  = 300;
 int ir_estop = 0;
 
 // Motor encoders
-int left_encoder_pin_A = 14;
-int left_encoder_pin_B = 15;
+int left_encoder_pin_A = 25;
+int left_encoder_pin_B = 24;
 int left_encoder_A_curr_val = LOW;
 int left_encoder_A_prev_val = LOW;
 int left_encoder_B_curr_val = LOW;
 int left_encoder_pos = 0;
-int right_encoder_pin_A = 16;
-int right_encoder_pin_B = 17;
+int right_encoder_pin_A = 23;
+int right_encoder_pin_B = 22;
 int right_encoder_A_curr_val = LOW;
 int right_encoder_A_prev_val = LOW;
 int right_encoder_B_curr_val = LOW;
