@@ -3,7 +3,6 @@
 #include <geometry_msgs/Twist.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Int16.h>
-#include <std_msgs/Int32MultiArray.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Header.h>
 #include <geometry_msgs/Point.h>
@@ -55,7 +54,7 @@ int current_angular_vel = 0;
 
 // Pins and servo objects for sonar sensor
 const byte SONAR_PIN = A7;
-const byte SONAR_PAN_PIN =45;
+const byte SONAR_PAN_PIN = 45;
 
 Adafruit_TiCoServo sonar_pan_servo;
 
@@ -76,18 +75,12 @@ const byte IR_PIN_2 = A1;
 const int ir_low_threshold  = 300;
 int ir_estop = 0;
 
-// Motor encoders
-int left_encoder_pin_A = 23;
-int left_encoder_pin_B = 22;
-int left_encoder_A_curr_val = LOW;
-int left_encoder_A_prev_val = LOW;
-int left_encoder_B_curr_val = LOW;
+// Motor encoder globals
+int left_encoder_pin_A = 18;
+int left_encoder_pin_B = 19;
 int left_encoder_pos = 0;
-int right_encoder_pin_A = 25;
-int right_encoder_pin_B = 24;
-int right_encoder_A_curr_val = LOW;
-int right_encoder_A_prev_val = LOW;
-int right_encoder_B_curr_val = LOW;
+int right_encoder_pin_A = 20;
+int right_encoder_pin_B = 21;
 int right_encoder_pos = 0;
 
 // Set up ROS node handling and feedback channel
@@ -169,6 +162,8 @@ ros::Subscriber<std_msgs::Int16>odroid_estop_sub("odroid_estop",&odroidEstopCall
 
 // SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
 void setup(){
+  Serial.begin(57600);
+  
   // Initialize timing things
   current_time = millis();
   blink_time   = millis();
@@ -192,10 +187,18 @@ void setup(){
   // Define pin modes
   pinMode(ESTOP_PIN, INPUT);
   pinMode(SONAR_PAN_PIN, INPUT);
+  
+  // Setup encoders and encoder interrupts
   pinMode(left_encoder_pin_A, INPUT);
+  digitalWrite(left_encoder_pin_A, HIGH);
   pinMode(left_encoder_pin_B, INPUT);
+  digitalWrite(left_encoder_pin_B, HIGH);
+  attachInterrupt(digitalPinToInterrupt(left_encoder_pin_A), update_left_encoder, CHANGE);
   pinMode(right_encoder_pin_A, INPUT);
+  digitalWrite(right_encoder_pin_A, HIGH);
   pinMode(right_encoder_pin_B, INPUT);
+  digitalWrite(right_encoder_pin_B, HIGH);
+  attachInterrupt(digitalPinToInterrupt(right_encoder_pin_A), update_right_encoder, CHANGE);
   
   // Attach Servo objects to correct pins
   forward_channel.attach(FORWARD_PIN);
@@ -221,7 +224,6 @@ void loop() {
   // Read Midbrain commands
   
   // Sense: Read robot sensors
-  read_encoders();
   update_pan_and_read_sonar();
   
   // Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
@@ -257,47 +259,33 @@ void chat(String message) {
   chatter_publisher.publish( &chatter_msg );
 }
 
-// Read left and right motor encoders and update values
-void read_encoders() {
-  left_encoder_A_curr_val = digitalRead(left_encoder_pin_A);
-  left_encoder_B_curr_val = digitalRead(left_encoder_pin_B);
-  right_encoder_A_curr_val = digitalRead(right_encoder_pin_A);
-  right_encoder_B_curr_val = digitalRead(right_encoder_pin_B);
-  
-  // If left encoder channel A has gone from low to high
-  if (left_encoder_A_prev_val == LOW && left_encoder_A_curr_val == HIGH) {
-    if (left_encoder_B_curr_val == LOW) {
-      left_encoder_pos--;
-    }
-    else {
-      left_encoder_pos++;
-    }
+void update_left_encoder() {
+  int channel_A = digitalRead(left_encoder_pin_A);
+  int channel_B = digitalRead(left_encoder_pin_B);
+  if (channel_A == channel_B) {
+    left_encoder_pos++;
+  }
+  else {
+    left_encoder_pos--;
   }
   
-  // If right encoder channel A has gone from low to high
-  if (right_encoder_A_prev_val == LOW && right_encoder_A_curr_val == HIGH) {
-    if (right_encoder_B_curr_val == LOW) {
-      right_encoder_pos--;
-    }
-    else {
-      right_encoder_pos++;
-    }
-  }
-
-  // Update previous encoder values for next loop
-  left_encoder_A_prev_val = left_encoder_A_curr_val;
-  right_encoder_A_prev_val = right_encoder_A_curr_val;
-
-  // Publish individual encoder data
   encoder_left_msg.data = left_encoder_pos;
-  encoder_right_msg.data = right_encoder_pos;
   encoder_left_publisher.publish(&encoder_left_msg);
-  encoder_right_publisher.publish(&encoder_right_msg);
+}
+
+void update_right_encoder() {
+  Serial.println("asdf");
+  int channel_A = digitalRead(right_encoder_pin_A);
+  int channel_B = digitalRead(right_encoder_pin_B);
+  if (channel_A == channel_B) {
+    right_encoder_pos++;
+  }
+  else {
+    right_encoder_pos--;
+  }
   
-//  // Publisher encoder data
-//  encoder_data_msg.data[0] = left_encoder_pos;
-//  encoder_data_msg.data[1] = right_encoder_pos;
-//  encoder_data_publisher.publish(&encoder_data_msg);
+  encoder_right_msg.data = right_encoder_pos;
+  encoder_right_publisher.publish(&encoder_right_msg);
 }
 
 // Update motor speeds
@@ -468,7 +456,7 @@ void change_left_colors(uint32_t color){
   left_ring.show();
   right_ring.show();
 }
- 
+
 void change_right_colors(uint32_t color){
   for (int i = 0; i < 8; i++)
   {
@@ -485,3 +473,21 @@ void change_right_colors(uint32_t color){
   left_ring.show();
   right_ring.show();
 }
+
+//// Helper function for attaching an interrupt to a pin
+//int digitalPinToInterrupt(int pin) {
+//  switch(pin) {
+//    case 2:
+//      return 0;
+//    case 3:
+//      return 1;
+//    case 18:
+//      return 5;
+//    case 19:
+//      return 4;
+//    case 20:
+//      return 3;
+//    case 21:
+//      return 2;
+//  }
+//}
