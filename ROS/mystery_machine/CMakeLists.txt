@@ -26,3 +26,6 @@ target_link_libraries(lidar_tf_publisher ${catkin_LIBRARIES})
 
 add_executable(sonar_transform src/sonar_transform.cpp)
 target_link_libraries(sonar_transform ${catkin_LIBRARIES})
+
+add_executable(odometry_publisher src/odometry_publisher.cpp)
+target_link_libraries(odometry_publisher ${catkin_LIBRARIES})

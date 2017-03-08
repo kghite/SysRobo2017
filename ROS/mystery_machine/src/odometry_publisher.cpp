@@ -7,6 +7,7 @@ long _PreviousLeftEncoderCounts = 0;
 long _PreviousRightEncoderCounts = 0;
 ros::Time current_time_encoder, last_time_encoder;
 double DistancePerCount = (3.14159265 * 0.1524) / 64000;
+double LengthBetweenTwoWheels = 0.25;
 
 double x;
 double y;
@@ -20,7 +21,7 @@ double deltaRight;
 
 void WheelCallback(const geometry_msgs::Vector3::ConstPtr& ticks)
 {
-
+  // Break encoder message into sides
   current_time_encoder = ros::Time::now();
 
   deltaLeft = ticks->x - _PreviousLeftEncoderCounts;
@@ -28,7 +29,6 @@ void WheelCallback(const geometry_msgs::Vector3::ConstPtr& ticks)
 
   vx = deltaLeft * DistancePerCount; // (current_time_encoder - last_time_encoder).toSec();
   vy = deltaRight * DistancePerCount; // (current_time_encoder - last_time_encoder).toSec();
-
 
   _PreviousLeftEncoderCounts = ticks->x;
   _PreviousRightEncoderCounts = ticks->y;
@@ -39,7 +39,7 @@ int main(int argc, char **argv)
 {
   ros::init(argc, argv, "odometry_publisher");
   ros::NodeHandle n;
-  ros::Subscriber sub = n.subscribe("wheel_encoder", 100, WheelCallback);
+  ros::Subscriber sub = n.subscribe("encoder_data", 100, WheelCallback);
   ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("odom", 50);   
   tf::TransformBroadcaster odom_broadcaster;
 
@@ -103,5 +103,6 @@ int main(int argc, char **argv)
 
     last_time = current_time;
     r.sleep();
+    ros::spinOnce;
   }
 }
