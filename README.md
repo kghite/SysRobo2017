@@ -49,7 +49,19 @@ The funrobo_robot and phiget_drivers directories are independent git repositorie
 
 ### SSH Into the ODROID
 
+**WiFi**
+
+Make sure you are connected to the OLIN-ROBOTICS WiFi network.
+
 `ssh odroid@192.168.16.83`
+
+**Ethernet**
+
+Scan for the correct IP address using the eth0 IP address from `ifconfig`.
+
+`nmap ##.##.##.0/24`
+
+SSH into the IP address with port 22 open.
 
 ### Teleop Mode
 
