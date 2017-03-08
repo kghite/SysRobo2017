@@ -4,6 +4,7 @@
 #include <std_msgs/String.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32MultiArray.h>
+#include <std_msgs/Int32.h>
 #include <std_msgs/Header.h>
 #include <geometry_msgs/Point.h>
 #include <geometry_msgs/PointStamped.h>
@@ -52,7 +53,7 @@ int current_angular_vel = 0;
 
 // Pins and servo objects for sonar sensor
 const byte SONAR_PIN = A7;
-const byte SONAR_PAN_PIN = 36;
+const byte SONAR_PAN_PIN =45;
 
 Adafruit_TiCoServo sonar_pan_servo;
 
@@ -74,14 +75,14 @@ const int ir_low_threshold  = 300;
 int ir_estop = 0;
 
 // Motor encoders
-int left_encoder_pin_A = 25;
-int left_encoder_pin_B = 24;
+int left_encoder_pin_A = 24;
+int left_encoder_pin_B = 25;
 int left_encoder_A_curr_val = LOW;
 int left_encoder_A_prev_val = LOW;
 int left_encoder_B_curr_val = LOW;
 int left_encoder_pos = 0;
-int right_encoder_pin_A = 23;
-int right_encoder_pin_B = 22;
+int right_encoder_pin_A = 22;
+int right_encoder_pin_B = 23;
 int right_encoder_A_curr_val = LOW;
 int right_encoder_A_prev_val = LOW;
 int right_encoder_B_curr_val = LOW;
@@ -101,6 +102,12 @@ ros::Publisher sonar_data_publisher("sonar_data", &sonar_data_msg);
 
 std_msgs::Int32MultiArray encoder_data_msg;
 ros::Publisher encoder_data_publisher("encoder_data", &encoder_data_msg);
+
+std_msgs::Int32 encoder_left_msg;
+ros::Publisher encoder_left_publisher("encoder_left", &encoder_left_msg);
+
+std_msgs::Int32 encoder_right_msg;
+ros::Publisher encoder_right_publisher("encoder_right", &encoder_right_msg);
 
 // Various variables for ROS workings
 int odroid_estop = 0;
@@ -276,6 +283,12 @@ void read_encoders() {
   // Update previous encoder values for next loop
   left_encoder_A_prev_val = left_encoder_A_curr_val;
   right_encoder_A_prev_val = right_encoder_A_curr_val;
+
+  // Publish individual encoder data
+  encoder_left_msg.data = left_encoder_pos;
+  encoder_right_msg.data = right_encoder_pos;
+  encoder_left_publisher.publish(&encoder_left_msg);
+  encoder_right_publisher.publish(&encoder_right_msg);
   
   // Publisher encoder data
   encoder_data_msg.data[0] = left_encoder_pos;
