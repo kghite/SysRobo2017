@@ -9,6 +9,8 @@
 #include <geometry_msgs/PointStamped.h>
 #include <Adafruit_TiCoServo.h>
 
+#define USB_CON
+
 // Global constants
 const float pi = 3.14159;
 const char *GLOBAL_FRAME = "1";

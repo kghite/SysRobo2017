@@ -1,6 +1,6 @@
  int val; 
- int encoder0PinA = 3;
- int encoder0PinB = 4;
+ int encoder0PinA = 22;
+ int encoder0PinB = 23;
  int encoder0Pos = 0;
  int encoder0PinALast = LOW;
  int n = LOW;
