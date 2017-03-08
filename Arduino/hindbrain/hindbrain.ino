@@ -472,20 +472,20 @@ void change_right_colors(uint32_t color){
   right_ring.show();
 }
 
-// Helper function for attaching an interrupt to a pin
-int digitalPinToInterrupt(int pin) {
-  switch(pin) {
-    case 2:
-      return 0;
-    case 3:
-      return 1;
-    case 18:
-      return 5;
-    case 19:
-      return 4;
-    case 20:
-      return 3;
-    case 21:
-      return 2;
-  }
-}
+//// Helper function for attaching an interrupt to a pin
+//int digitalPinToInterrupt(int pin) {
+//  switch(pin) {
+//    case 2:
+//      return 0;
+//    case 3:
+//      return 1;
+//    case 18:
+//      return 5;
+//    case 19:
+//      return 4;
+//    case 20:
+//      return 3;
+//    case 21:
+//      return 2;
+//  }
+//}
