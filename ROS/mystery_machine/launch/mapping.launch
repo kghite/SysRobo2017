@@ -38,6 +38,12 @@
 
         <!-- MAPPING -->
 
+        <!-- Multi Map Nav -->
+        <node pkg="multi_map_navigation" type="multi_map_navigation" name="multi_map_navigation" output="screen">
+        	<param name="definition_file" value="YAML" />
+        	<param name="transition_types" value="TYPES" />
+  		</node>
+
         <!-- Gmapping -->
         <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" >
                 <param name="scan" value="scan" />
