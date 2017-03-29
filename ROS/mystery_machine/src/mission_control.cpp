@@ -1,3 +1,12 @@
+/*
+ * File: mission_control.cpp
+ * 
+ * Updated: 3/29/17
+ * 
+ * Description: ROS integrated FSM for building mapping and elevator
+ * exploration with the Mystery Machine  
+*/
+
 #include "string"
 #include "list"
 #include "iostream"
