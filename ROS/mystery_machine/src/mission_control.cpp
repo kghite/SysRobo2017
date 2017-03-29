@@ -7,6 +7,7 @@
 #include "geometry_msgs/PoseStamped.h"
 #include "nav_msgs/OccupancyGrid.h"
 #include "std_msgs/Int8.h"
+#include "std_msgs/Int16.h"
 
 // Set up state values
 enum State {
@@ -18,19 +19,32 @@ enum State {
 	matching_map
 };
 
+struct Floor {
+	int number;
+	std::string id;
+};
+
+struct FloorSet {
+	std::list<Floor> floor_order;
+	float probs[];
+	float certainty;
+};
+
 class FSM {
 	public:
+		State state;
 		geometry_msgs::PoseStamped current_pose;
-		geometry_msgs::goal_pose;
-		Int8 floor;
+		geometry_msgs::Pose goal_pose;
+		std_msgs::Int8 floor;
 
-		int explore_floor();
+		float explore_floor();
 		geometry_msgs::Pose find_elevator(nav_msgs::OccupancyGrid search_map);
 		bool nav_to_elevator(geometry_msgs::Pose elevator_pose);
-		list<string> ordering_maps(string map_store_file);
-		int elevator_interaction();
-		int map_matching();
-}
+		FloorSet ordering_maps(std::string map_store_file, 
+								std_msgs::Int8 direction);
+		FloorSet elevator_interaction();
+		Floor map_matching();
+};
 
 /* 
  * Runs gmapping to explore an unmapped floor to some percentage complete
@@ -73,7 +87,7 @@ bool FSM::nav_to_elevator(geometry_msgs::Pose elevator_pose) {
  *
  * return: a list of map IDs in orders with order probabilities
  */
-int[][] FSM::ordering_maps(string map_store_file, 
+FloorSet FSM::ordering_maps(std::string map_store_file, 
 								std_msgs::Int8 direction){
 	// Determine all possible map orders and return with a given likelihood
 }
@@ -84,7 +98,7 @@ int[][] FSM::ordering_maps(string map_store_file,
  * return: the list of possible floor IDs that the robot could be at on 
  * elevator exit
  */
-int[] FSM::elevator_interaction() {
+FloorSet FSM::elevator_interaction() {
 	// Do normal interaction things
 }
 
@@ -95,15 +109,30 @@ int[] FSM::elevator_interaction() {
  *
  * return: a map ID that was matched (-1 for no match)
  */
-int FSM::map_matching() {
+Floor FSM::map_matching() {
 
 }
 
-int main() {
-	// Init mission controller to first state
+void stateResponse(const std_msgs::Int16 estop) {
+	// This callback actually runs everything
+}
+
+int main(int argc, char **argv) {
+	// Init mission controller to first state on ground floor
 	FSM mission_controller;
-	mission_controller.state = explore_floor;
+	mission_controller.state = exploring;
+	mission_controller.floor.data = 1;
+
+	ros::init(argc, argv, "mission_control");
+
+  	ros::NodeHandle n;
 
 	// Continuously check the state and run the appropriate class methods
 	// States get changed in the methods only
+	// Do all this in a callback so will pause if the e-stop is pressed
+  	ros::Subscriber sub_estop = n.subscribe("/estop", 200, stateResponse);
+
+  	ros::spin();
+
+  	return 0;
 }
