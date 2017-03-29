@@ -2,11 +2,13 @@
 #include <geometry_msgs/Vector3.h>
 #include <tf/transform_broadcaster.h>
 #include <nav_msgs/Odometry.h>
+#include <std_msgs/Int32.h>
 
 long _PreviousLeftEncoderCounts = 0;
 long _PreviousRightEncoderCounts = 0;
 ros::Time current_time_encoder, last_time_encoder;
 double DistancePerCount = (3.14159265 * 0.1524) / 168;
+double lengthBetweenTwoWheels = 0.31115;
 
 double x;
 double y;
@@ -18,28 +20,43 @@ double vth;
 double deltaLeft;
 double deltaRight;
 
-void WheelCallback(const geometry_msgs::Vector3::ConstPtr& ticks)
-{
+long left = 0;
+long right = 0;
+
+void updateDeltas() {
   // Break encoder message into sides
   current_time_encoder = ros::Time::now();
 
-  deltaLeft = ticks->x - _PreviousLeftEncoderCounts;
-  deltaRight = ticks->y - _PreviousRightEncoderCounts;
+  deltaLeft = left - _PreviousLeftEncoderCounts;
+  deltaRight = right - _PreviousRightEncoderCounts;
 
   vx = deltaLeft * DistancePerCount; // (current_time_encoder - last_time_encoder).toSec();
   vy = deltaRight * DistancePerCount; // (current_time_encoder - last_time_encoder).toSec();
+  vth = ((vy - vx)/lengthBetweenTwoWheels);
 
-  _PreviousLeftEncoderCounts = ticks->x;
-  _PreviousRightEncoderCounts = ticks->y;
+  _PreviousLeftEncoderCounts = left;
+  _PreviousRightEncoderCounts = right;
   last_time_encoder = current_time_encoder;
+}
+
+void rightCallback(const std_msgs::Int32 right_ticks) {
+  ROS_INFO("Right Encoder: %i", right_ticks.data);
+  right = (long) right_ticks.data;
+}
+
+void leftCallback(const std_msgs::Int32 left_ticks)
+{
+  ROS_INFO("Left Encoder: %i", left_ticks.data);
+  left = -1.0 * (long) left_ticks.data;
 }
 
 int main(int argc, char **argv)
 {
   ros::init(argc, argv, "odometry_publisher");
   ros::NodeHandle n;
-  ros::Subscriber sub = n.subscribe("encoder_data", 100, WheelCallback);
-  ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("odom", 50);   
+  ros::Subscriber sub_left = n.subscribe("/encoder_left", 100, leftCallback);
+  ros::Subscriber sub_right = n.subscribe("/encoder_right", 100, rightCallback);
+  ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("/odom", 50);   
   tf::TransformBroadcaster odom_broadcaster;
 
 
@@ -52,6 +69,8 @@ int main(int argc, char **argv)
   while(n.ok()){
 
     current_time = ros::Time::now();
+
+    updateDeltas();
 
     //compute odometry in a typical way given the velocities of the robot
     double dt = (current_time - last_time).toSec();
@@ -102,6 +121,6 @@ int main(int argc, char **argv)
 
     last_time = current_time;
     r.sleep();
-    ros::spinOnce;
+    ros::spinOnce();
   }
 }
