@@ -20,7 +20,7 @@
     <!-- Camera -->
     <arg name="camera_port" default="/dev/video1" />
     <node pkg="uvc_camera" type="uvc_camera_node" name="uvc_camera_node">
-            <param name="device" value="$(arg camera_port)" />
+        <param name="device" value="$(arg camera_port)" />
     </node>
 
 
@@ -46,18 +46,21 @@
     <!-- MAPPING -->
 
     <!-- Multi Map Nav -->
-    <!-- <node pkg="multi_map_navigation" type="multi_map_navigation" name="multi_map_navigation" output="screen">
-            <param name="definition_file" value="YAML" />
-            <param name="transition_types" value="TYPES" />
-            </node> -->
+    <!-- <node pkg="multi_map_navigation" type="multi_map_navigation"
+        name="multi_map_navigation" output="screen">
+        <param name="definition_file" value="YAML" />
+        <param name="transition_types" value="TYPES" />
+    </node> -->
 
     <!-- Gmapping -->
     <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" >
-            <param name="scan" value="scan" />
+        <param name="scan" value="scan" />
     </node>
 
 
-    <!-- Teleop -->
+    <!-- TELEOP -->
+
+    <!-- Teleop Twist -->
     <node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py"
         name="teleop_twist_keyboard" />
 
