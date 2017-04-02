@@ -34,7 +34,9 @@
 
     <!-- Odometry Publisher -->
     <node pkg="mystery_machine" type="odometry_publisher"
-        name="odometry_publisher" />
+        name="odometry_publisher"
+        output="screen"
+        />
 
 
     <!-- MAPPING -->

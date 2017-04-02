@@ -50,16 +50,25 @@ void rightCallback(const std_msgs::Int32 right_ticks) {
 
 void leftCallback(const std_msgs::Int32 left_ticks) {
     ROS_INFO("Left Encoder: %i", left_ticks.data);
+
+    printf("%s LEFT CALLBACK \n");
+    printf("Left Encoder: %i \n \n", left_ticks.data);
+
     left = -1.0 * (long) left_ticks.data;
 }
 
 int main(int argc, char **argv) {
+
     ros::init(argc, argv, "odometry_publisher");
     ros::NodeHandle n;
+
+    printf("%s INIT SUBS \n\n");
     ros::Subscriber sub_left = n.subscribe("/encoder_left", 100,
         leftCallback);
     ros::Subscriber sub_right = n.subscribe("/encoder_right", 100,
         rightCallback);
+    printf("%s SUBS INIT'D \n\n");
+
     ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("/odom", 50);   
     tf::TransformBroadcaster odom_broadcaster;
 
@@ -79,6 +88,12 @@ int main(int argc, char **argv) {
         double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
         double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
         double delta_th = vth * dt;
+
+        // printf("th: %f \n", th);
+        printf("dt: %f \n", dt);
+        // printf("dx: %f \n", delta_x);
+        // printf("dy: %f \n", delta_y);
+        // printf("dth: %f \n \n", delta_th);
 
         x += delta_x;
         y += delta_y;
