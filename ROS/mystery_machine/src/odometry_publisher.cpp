@@ -93,22 +93,10 @@ int main(int argc, char **argv) {
         odom_tf.header.stamp = current_time;
         odom_tf.header.frame_id = "odom";
         odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
         odom_tf.child_frame_id = "base_link";
 
         odom_tf.transform.translation.x = x;
         odom_tf.transform.translation.y = y;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
-        odom_tf.transform.translation.z = 0.0;
         odom_tf.transform.translation.z = 0.0;
         odom_tf.transform.rotation = odom_quat;
 
