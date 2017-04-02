@@ -35,8 +35,8 @@ struct Floor {
 
 struct FloorSet {
 	std::list<Floor> floor_order;
-	float probs[];
 	float certainty;
+	float probs[];
 };
 
 class FSM {
