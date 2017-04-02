@@ -20,39 +20,39 @@
 
 // Set up state values
 enum State {
-	exploring,
-	finding_elevator,
-	naving_to_elevator,
-	ordering_maps,
-	riding_elevator,
-	matching_map
+    exploring,
+    finding_elevator,
+    naving_to_elevator,
+    ordering_maps,
+    riding_elevator,
+    matching_map
 };
 
 struct Floor {
-	int number;
-	std::string id;
+    int number;
+    std::string id;
 };
 
 struct FloorSet {
-	std::list<Floor> floor_order;
-	float certainty;
-	float probs[];
+    std::list<Floor> floor_order;
+    float certainty;
+    float probs[];
 };
 
 class FSM {
-	public:
-		State state;
-		geometry_msgs::PoseStamped current_pose;
-		geometry_msgs::Pose goal_pose;
-		std_msgs::Int8 floor;
+    public:
+        State state;
+        geometry_msgs::PoseStamped current_pose;
+        geometry_msgs::Pose goal_pose;
+        std_msgs::Int8 floor;
 
-		float explore_floor();
-		geometry_msgs::Pose find_elevator(nav_msgs::OccupancyGrid search_map);
-		bool nav_to_elevator(geometry_msgs::Pose elevator_pose);
-		FloorSet ordering_maps(std::string map_store_file, 
-								std_msgs::Int8 direction);
-		FloorSet elevator_interaction();
-		Floor map_matching();
+        float explore_floor();
+        geometry_msgs::Pose find_elevator(nav_msgs::OccupancyGrid search_map);
+        bool nav_to_elevator(geometry_msgs::Pose elevator_pose);
+        FloorSet ordering_maps(std::string map_store_file,
+            std_msgs::Int8 direction);
+        FloorSet elevator_interaction();
+        Floor map_matching();
 };
 
 /* 
@@ -62,7 +62,7 @@ class FSM {
  * of the map
  */
 float FSM::explore_floor() {
-	// Gmapping integration
+    // Gmapping integration
 }
 
 /* 
@@ -74,7 +74,7 @@ float FSM::explore_floor() {
  * return: a robot pose at the elevator doors for loading
  */
 geometry_msgs::Pose FSM::find_elevator(nav_msgs::OccupancyGrid search_map) {
-	// Find an elevator within a map
+    // Find an elevator within a map
 }
 
 /* 
@@ -85,7 +85,7 @@ geometry_msgs::Pose FSM::find_elevator(nav_msgs::OccupancyGrid search_map) {
  * return: a boolean indicator that the robot has reached the target pose
  */
 bool FSM::nav_to_elevator(geometry_msgs::Pose elevator_pose) {
-	// Go to an elevator loading position
+    // Go to an elevator loading position
 }
 
 /* 
@@ -96,8 +96,8 @@ bool FSM::nav_to_elevator(geometry_msgs::Pose elevator_pose) {
  *
  * return: a list of map IDs in orders with order probabilities
  */
-FloorSet FSM::ordering_maps(std::string map_store_file, 
-								std_msgs::Int8 direction){
+FloorSet FSM::ordering_maps(std::string map_store_file,
+    std_msgs::Int8 direction){
 	// Determine all possible map orders and return with a given likelihood
 }
 
@@ -108,7 +108,7 @@ FloorSet FSM::ordering_maps(std::string map_store_file,
  * elevator exit
  */
 FloorSet FSM::elevator_interaction() {
-	// Do normal interaction things
+    // Do normal interaction things
 }
 
 /* 
@@ -123,25 +123,25 @@ Floor FSM::map_matching() {
 }
 
 void stateResponse(const std_msgs::Int16 estop) {
-	// This callback actually runs everything
+    // This callback actually runs everything
 }
 
 int main(int argc, char **argv) {
-	// Init mission controller to first state on ground floor
-	FSM mission_controller;
-	mission_controller.state = exploring;
-	mission_controller.floor.data = 1;
+    // Init mission controller to first state on ground floor
+    FSM mission_controller;
+    mission_controller.state = exploring;
+    mission_controller.floor.data = 1;
 
-	ros::init(argc, argv, "mission_control");
+    ros::init(argc, argv, "mission_control");
 
-  	ros::NodeHandle n;
+    ros::NodeHandle n;
 
-	// Continuously check the state and run the appropriate class methods
-	// States get changed in the methods only
-	// Do all this in a callback so will pause if the e-stop is pressed
-  	ros::Subscriber sub_estop = n.subscribe("/estop", 200, stateResponse);
+    // Continuously check the state and run the appropriate class methods
+    // States get changed in the methods only
+    // Do all this in a callback so will pause if the e-stop is pressed
+    ros::Subscriber sub_estop = n.subscribe("/estop", 200, stateResponse);
 
-  	ros::spin();
+    ros::spin();
 
-  	return 0;
+    return 0;
 }

@@ -51,7 +51,9 @@
     </node>
 
 
-    <!-- Teleop -->
+    <!-- TELEOPERATION -->
+
+    <!-- Teleop from Keyboard -->
     <node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py"
         name="teleop_twist_keyboard" />
 
