@@ -76,7 +76,7 @@ To initialize and visualize the LIDAR scans on /scan run:
 
 `sudo chmod a+rw /dev/ttyACM1`
 
-`rosrun hokuyo_node hokuyo_node /dev/ttyACM1`
+`rosrun hokuyo_node hokuyo_node _port:=/dev/ttyACM1`
 
 `rosrun rviz rviz`
 
