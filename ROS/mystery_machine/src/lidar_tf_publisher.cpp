@@ -12,8 +12,9 @@ int main(int argc, char** argv){
   while(n.ok()){
     broadcaster.sendTransform(
       tf::StampedTransform(
-        tf::Transform(tf::Quaternion(0, 0, 0, 1), tf::Vector3(0.0, 0.3302, -0.0889)),
-        ros::Time::now(),"base_link", "laser"));
+        tf::Transform(tf::Quaternion(3.14, 0, -1.57),
+            tf::Vector3(0.0, -0.3302, 0.0889)),
+            ros::Time::now(),"base_link", "laser"));
     r.sleep();
   }
 }
