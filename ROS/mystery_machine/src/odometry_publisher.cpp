@@ -58,12 +58,10 @@ int main(int argc, char **argv) {
     ros::init(argc, argv, "odometry_publisher");
     ros::NodeHandle n;
 
-    ROS_INFO("INIT SUBS");
     ros::Subscriber sub_left = n.subscribe("/left_encoder", 100,
         leftCallback);
     ros::Subscriber sub_right = n.subscribe("/right_encoder", 100,
         rightCallback);
-    ROS_INFO("SUBS INIT'D");
 
     ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("/odom", 50);   
     tf::TransformBroadcaster odom_broadcaster;
