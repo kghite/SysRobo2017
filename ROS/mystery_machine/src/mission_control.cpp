@@ -24,7 +24,10 @@ enum State {
     finding_elevator,
     naving_to_elevator,
     ordering_maps,
+    calling_elevator,
+    entering_elevator,
     riding_elevator,
+    exiting_elevator,
     matching_map
 };
 
@@ -86,7 +89,7 @@ geometry_msgs::Pose FSM::find_elevator(nav_msgs::OccupancyGrid search_map) {
  */
 bool FSM::nav_to_elevator(geometry_msgs::Pose elevator_pose) {
     // Go to an elevator loading position
-    // Note that the wpt must be positioned such that the lidar can detect both elevators
+    // Note that wpt must be positioned such that scan can detect both elevators
 }
 
 /* 
@@ -103,14 +106,35 @@ FloorSet FSM::ordering_maps(std::string map_store_file,
 }
 
 /* 
- * Provide HRI and elevator behaviors such as loading, riding, and unloading
+ * Provide HRI around calling elevator.
+ */
+FloorSet FSM::call_elevator() {
+}
+
+/* 
+ * Provide HRI around entering elevator.
+ */
+FloorSet FSM::enter_elevator() {
+}
+
+/* 
+ * Provide HRI around riding elevator.
+ */
+FloorSet FSM::ride_elevator() {
+}
+
+ /*
+ * Provide HRI around exiting elevator.
  *
  * return: the list of possible floor IDs that the robot could be at on 
  * elevator exit
  */
-FloorSet FSM::elevator_interaction() {
-    // Do normal interaction things
+FloorSet FSM::exit_elevator() {
 }
+
+
+
+
 
 /* 
  * Runs SLAM to match a stored map to the robot location on exiting an 
