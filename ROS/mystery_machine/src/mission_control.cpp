@@ -181,8 +181,9 @@ void FSM::enter_elevator() {
         cmd_vel.angular.z = 0.01;
         cmd_vel_pub.publish(cmd_vel);
 
+        // TODO: format odom correctly to track angular change
         // // stop rotating once we've gone 180
-        // if (odom == 180) {   // TODO: actually make this something odom translatable
+        // if (odom == 180) {
         //  cmd_vel.angular.z = 0;
         //  cmd_vel_pub.publish(cmd_vel);
         // }
@@ -216,6 +217,7 @@ FloorSet FSM::exit_elevator() {
     cmd_vel.linear.y = 0.05;
     cmd_vel_pub.publish(cmd_vel);
 
+    // TODO: format odom correctly to track y dist traveled
     // // Once bot has exited elevator, stop
     // if (odom < 2) {
     //     cmd_vel.linear.y = 0;
@@ -267,6 +269,8 @@ int main(int argc, char **argv) {
     // Do all this in a callback so will pause if the e-stop is pressed
 
     ros::Subscriber sub_estop = n.subscribe("/estop", 200, stateResponse);
+
+    // TODO: confirm rate for the following subscribers
     ros::Subscriber sub_scan = n.subscribe("/scan", 200, scanResponse);
     ros::Subscriber sub_odom = n.subscribe("/odom", 200, odomResponse);
 
