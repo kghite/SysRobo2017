@@ -206,20 +206,31 @@ void FSM::ride_elevator() {
  * elevator exit
  */
 FloorSet FSM::exit_elevator() {
-    // Start playing soundtrack: “exiting elevator, please stand clear”
-    // Drive straight out of elevator for x-dist
-    // Stop playing soundtrack: “exiting elevator, please stand clear”
+
+    // Publish state to allow Sound Arduino to do it's thang
+    std_msgs::Int8 tmp = std_msgs::Int8();
+    tmp.data = state;
+    state_pub.publish(tmp);
+
+    // Exit elevator slowly
+    cmd_vel.linear.y = 0.05;
+    cmd_vel_pub.publish(cmd_vel);
+
+    // // Once bot has exited elevator, stop
+    // if (odom < 2) {
+    //     cmd_vel.linear.y = 0;
+    //     cmd_vel_pub.publish(cmd_vel);
+    // }
+
+    // Map matching behavior goes here.
+
 }
-
-
-
 
 
 /* 
  * Runs SLAM to match a stored map to the robot location on exiting an 
  * elevator
  * 
- *
  * return: a map ID that was matched (-1 for no match)
  */
 Floor FSM::map_matching() {
