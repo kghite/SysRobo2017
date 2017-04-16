@@ -193,10 +193,10 @@ void FSM::enter_elevator() {
  * Provide HRI around riding elevator.
  */
 void FSM::ride_elevator() {
-    // Stop playing soundtrack: “entering elevator, please stand clear”
-    // Nothing really needs to go here; mostly handled by the Sound Arduino.
-    // Start playing soundtrack: *elevator music*
-    // Stop playing soundtrack: *elevator music*
+    // Publish state to allow Sound Arduino to do it's thang
+    std_msgs::Int8 tmp = std_msgs::Int8();
+    tmp.data = state;
+    state_pub.publish(tmp);
 }
 
  /*
