@@ -181,11 +181,11 @@ void FSM::enter_elevator() {
         cmd_vel.angular.z = 0.01;
         cmd_vel_pub.publish(cmd_vel);
 
-        // stop rotating once we've gone 180
-        if (odom == 180) {   // TODO: actually make this something odom translatable
-         cmd_vel.angular.z = 0;
-         cmd_vel_pub.publish(cmd_vel);
-        }
+        // // stop rotating once we've gone 180
+        // if (odom == 180) {   // TODO: actually make this something odom translatable
+        //  cmd_vel.angular.z = 0;
+        //  cmd_vel_pub.publish(cmd_vel);
+        // }
     }
 }
 
