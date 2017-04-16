@@ -149,9 +149,14 @@ FloorSet FSM::ordering_maps(std::string map_store_file,
  * rocking back and forth.
  */
 void FSM::call_elevator() {
-    // Turn to face elevators
-    // Start playing soundtrack: “can you call the elevator?”
-    // Stop playing soundtrack: “can you call the elevator?”
+
+    // Publish state to allow Sound Arduino to do it's thang
+    std_msgs::Int8 tmp = std_msgs::Int8();
+    tmp.data = state;
+    state_pub.publish(tmp);
+
+    // Rock back and forth
+
 }
 
 /* 
@@ -159,7 +164,7 @@ void FSM::call_elevator() {
  */
 void FSM::enter_elevator() {
 
-    // Wait 5s for passengers to fully exit elevator
+    // Wait for passengers to fully exit elevator
     sleep(3);
 
     // Publish state to allow Sound Arduino to do it's thang
