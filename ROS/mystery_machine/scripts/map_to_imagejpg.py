@@ -1,8 +1,7 @@
 #!/usr/bin/env python
-"""Feature matcher. Subscribbes to map, finds feature location in thresholded occupancy grid"""
-"""Publishes marker to that location"""
+"""Helper script that makes published map a croppable jpg"""
 import rospy
-from nav_msgs import OccupancyGrid
+from nav_msgs.msg import OccupancyGrid
 import cv2
 import numpy as np
 import cPickle as pickle
@@ -11,12 +10,11 @@ from scipy import misc, special,stats
 
 
 
-class Feature_Matcher():
+class Map_To_Image():
 
     def __init__(self):
         """ Initialize the robot control, """
-        rospy.init_node('robot_controller')
-        self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=10)
+        rospy.init_node('Occupancy Grid')
         self.sleepy = rospy.Rate(2)
         #subscribe to map for occupancy grid
         rospy.Subscriber('/map',OccupancyGrid, self.process_occupancy_grid)
@@ -27,35 +25,18 @@ class Feature_Matcher():
         #load feature to compare to 
         #self.features = np.load(self.featurepath)
         #image_cv2 = cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
+
         
-        # load template sign images as grayscale
-        self.elevators = cv2.imread(featurepath,0)
-        
-        map_pub = rospy.Publisher('/elevatormap',OccupancyGrid)
  
     def match_features(self):
         """ Matches features against template and publishes map with elevator location"""
         #load images into memory so if they're updated by a callback nothing gets broken
+        pause = raw_input("Press Enter to Make JPG")
         map_image = self.last_map
-        elevator_image = self.elevators
-        #
-        result =cv2.matchTemplate(map_image,elevator_image,'cv2.TM_CCOEFF')
-        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-        top_left = max_loc
-        confidence = max_val
-        #create new blank array
-        newgridarr = np.zeroes(self.map_width*self.map_height)
-        #make corresponding value 100% chance of occupancy
-        newgridarr[max_loc[0]*top_left[1]] = 100
-        #make occupancy grid.
-        newgrid = OccupancyGrid()
-        newgrid.info.widgh = self.map_width
-        newgrid.info.height = self.map_height
-        newgrid.data = newgridarr
+        print map_image
+        cv2.imshow('map',map_image)
+        cv2.imwrite( "Gray_Image.jpg", map_image);
 
-        #only publish if confidence is high
-        if confidence > 60:
-            map_pub.publish(newgrid)
 
 
 
@@ -66,8 +47,11 @@ class Feature_Matcher():
         '''
         #read into numpy array and shape correctly
         np_arr = np.fromstring(occupancy_grid.data, np.uint8)
+        print np_arr
         self.map_width = occupancy_grid.info.width
+        print self.map_width
         self.map_height = occupancy_grid.info.height
+        print self.map_height
         np_arr = np.reshape(np_arr,(occupancy_grid.info.width, occupancy_grid.info.height))
         #threshold to 0s and 1s
         binary_np = stats.threshold(stats.threshold(np_arr,50,101,1),50)
@@ -79,8 +63,8 @@ class Feature_Matcher():
     ##Main
 
     def run(self):    
-        self.sendMessage()
         self.sleepy.sleep()
+        self.match_features()
 
-feature = Feature_Matcher()
+feature = Map_To_Image()
 feature.run()
