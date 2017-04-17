@@ -1,15 +1,18 @@
 #include <Adafruit_NeoPixel.h>
 #include <ros.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Point.h>
+#include <sensor_msgs/LaserScan.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <std_msgs/Header.h>
-#include <geometry_msgs/Point.h>
-#include <geometry_msgs/PointStamped.h>
 #include <Adafruit_TiCoServo.h>
+#include <mystery_machine/SonarScan.h>
 
 #define USB_CON
+#define PI 3.14159265358979323846
 
 // Global constants
 const float pi = 3.14159;
@@ -60,7 +63,7 @@ Adafruit_TiCoServo sonar_pan_servo;
 // Variables for panning sonar servo
 int sonar_pan_angle = 90;
 unsigned long time_of_last_sonar_pan = millis();
-int sonar_pan_time_interval = 50;
+int sonar_pan_time_interval = 10;
 int sonar_pan_angle_increment = 1;
 float sonar_reading;
 int sonar_point_id = 0;
@@ -98,7 +101,7 @@ ros::Publisher debug_publisher("debug", &debug_msg);
 std_msgs::Int16 ir_estop_msg;
 ros::Publisher ir_estop_publisher("ir_estop", &ir_estop_msg);
 
-geometry_msgs::PointStamped sonar_data_msg;
+mystery_machine::SonarScan sonar_data_msg;
 ros::Publisher sonar_data_publisher("sonar_data", &sonar_data_msg);
 
 std_msgs::Int16 left_encoder_msg;
@@ -121,7 +124,7 @@ int current_tilt_position = middle_tilt_position;
 
 
 // Callback function for a Twist message TCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCb
-void twistCb( const geometry_msgs::Twist& twist_input ){
+void twistCb( const geometry_msgs::Twist& twist_input ) {
   
   // Extract velocity data
   // Multiply by 90 to maintain resolution
@@ -386,21 +389,22 @@ void update_pan_and_read_sonar() {
     sonar_pan_servo.write(sonar_pan_angle);
     time_of_last_sonar_pan = millis();
   }
-  sonar_reading = analogRead(SONAR_PIN);
+  sonar_reading = analogRead(SONAR_PIN)/100.0;
   sonar_point_id ++;
   sonar_data_msg.header.seq = sonar_point_id;
   sonar_data_msg.header.stamp.sec = millis()/1000;
   sonar_data_msg.header.stamp.nsec = (millis() * 1000) % 1000000;
-  sonar_data_msg.header.frame_id = GLOBAL_FRAME;
-  sonar_data_msg.point.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
-  sonar_data_msg.point.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
-  sonar_data_msg.point.z = 0;
+  sonar_data_msg.header.frame_id = "base_sonar";
+  sonar_data_msg.range_min = 0.05;
+  sonar_data_msg.range_max = 2.00;
+  sonar_data_msg.range = sonar_reading;
+  sonar_data_msg.angle = sonar_pan_angle; // angle in degrees where 0 is right and 180 is left
   sonar_data_publisher.publish(&sonar_data_msg);
 }
 
 
 // See if we need to estop based on IR input
-void check_ir_sensors(){
+void check_ir_sensors() {
   int ir_reading_1;
   int ir_reading_2;
   ir_reading_1 = analogRead(IR_PIN_1);
