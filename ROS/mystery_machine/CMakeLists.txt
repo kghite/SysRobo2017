@@ -2,10 +2,35 @@ cmake_minimum_required(VERSION 2.8.3)
 project(mystery_machine)
 
 ## Find catkin and any catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp rospy std_msgs geometry_msgs image_transport cv_bridge tf nav_msgs)
+find_package(catkin REQUIRED COMPONENTS
+    roscpp
+    rospy
+    std_msgs
+    geometry_msgs
+    image_transport
+    cv_bridge
+    tf
+    nav_msgs
+    message_generation
+)
+
+add_message_files(
+    FILES
+    SonarScan.msg
+)
+
+generate_messages(
+    DEPENDENCIES
+    std_msgs
+    sensor_msgs
+    geometry_msgs
+)
 
 ## Declare a catkin package
-catkin_package()
+catkin_package(
+    CATKIN_DEPENDS
+    message_runtime
+)
 
 include_directories(include ${catkin_INCLUDE_DIRS} ${OpenCV_INCLUDE_DIRS})
 
