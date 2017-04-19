@@ -34,11 +34,13 @@ enum State {
     matching_map
 };
 
+// This is received from the wormhole stack.
 struct Floor {
     int number;
     std::string id;
 };
 
+// This is received from the wormhole stack, also.
 struct FloorSet {
     std::list<Floor> floor_order;
     float probs[];
@@ -53,11 +55,17 @@ struct FloorSet {
 class FSM {
 
     public:  
-        // declaring ROS node handler
+        State state;
+
+        // declaring information resulting from callbacks
+        bool scan_changes;
+        std::vector<float> scan_old;
+        std::vector<float> scan_new;
+
+        // declaring constructor for FSM, which takes arg 'ROS node handler'
         FSM(ros::NodeHandle n);
 
         // declaring all msg types
-        State state;
         geometry_msgs::PoseStamped current_pose;
         geometry_msgs::Pose goal_pose;
         geometry_msgs::Twist cmd_vel;
@@ -68,6 +76,7 @@ class FSM {
         // declaring publishers
         ros::Publisher state_pub;
         ros::Publisher cmd_vel_pub;
+
 
         // declaring methods
         float explore_floor();
@@ -81,6 +90,9 @@ class FSM {
         void ride_elevator();
         FloorSet exit_elevator();
         Floor map_matching();
+
+        // declaring callback methods
+        void scanResponse(sensor_msgs::LaserScan scan);
 };
 
 /*
@@ -91,10 +103,14 @@ FSM::FSM(ros::NodeHandle n) {
     // initializing
     state = exploring;
     cmd_vel = geometry_msgs::Twist();
+    scan_changes = 0;   // 0 = no change; 1 = changed
+    // scan_old[512] = 0;
+    // scan_new[512] = 0;
 
     // declaring & initializing publishers
     state_pub = ros::Publisher(n.advertise<std_msgs::Int8>("/bot_state", 1000));
     cmd_vel_pub = ros::Publisher(n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000));
+
 }
 
 /* 
@@ -173,6 +189,7 @@ void FSM::enter_elevator() {
     state_pub.publish(tmp);
 
     // Enter elevator slowly (assume right-angle navigation)
+    // TODO: confirm this velocity
     cmd_vel.linear.y = 0.001;
     cmd_vel_pub.publish(cmd_vel);
 
@@ -219,6 +236,7 @@ FloorSet FSM::exit_elevator() {
     state_pub.publish(tmp);
 
     // Exit elevator slowly
+    // TODO: confirm this velocity
     cmd_vel.linear.y = 0.05;
     cmd_vel_pub.publish(cmd_vel);
 
@@ -244,10 +262,22 @@ Floor FSM::map_matching() {
 
 }
 
-void scanResponse(const sensor_msgs::LaserScan scan) {
-    // check right in front of me
-    // check at some angle to me
+void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
 
+    // TODO: don't forget to initialize scan_new, scan_old, and scan_bool in "init" method above
+
+    // set incoming data to scan_new
+    FSM::scan_new = scan.ranges;
+
+    // compare to scan_old, setting bool scan_changes appropriately
+    if (FSM::scan_new == FSM::scan_old) {
+        FSM::scan_changes = 1;
+    } else {
+        FSM::scan_changes = 0;
+    }
+
+    // set scan_new to scan_old
+    FSM::scan_old = FSM::scan_new;
 }
 
 void odomResponse(const nav_msgs::Odometry odom) {
@@ -268,7 +298,6 @@ int main(int argc, char **argv) {
     mission_controller.state = exploring;
     mission_controller.floor.data = 1;
 
-
     // Continuously check the state and run the appropriate class methods
     // States get changed in the methods only
     // Do all this in a callback so will pause if the e-stop is pressed
@@ -276,7 +305,7 @@ int main(int argc, char **argv) {
     ros::Subscriber sub_estop = n.subscribe("/estop", 200, stateResponse);
 
     // TODO: confirm rate for the following subscribers
-    ros::Subscriber sub_scan = n.subscribe("/scan", 200, scanResponse);
+    ros::Subscriber sub_scan = n.subscribe("/scan", 200, &FSM::scanResponse, &mission_controller);
     ros::Subscriber sub_odom = n.subscribe("/odom", 200, odomResponse);
 
     ros::spin();
