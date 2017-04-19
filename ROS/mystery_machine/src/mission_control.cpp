@@ -182,8 +182,15 @@ void FSM::call_elevator() {
     tmp.data = state;
     state_pub.publish(tmp);
 
-    // TODO: Rock back and forth
-
+    // Rock back and forth
+    // TODO: check while condition w/ Katie & Shane
+    while {
+        cmd_vel.linear.y = 0.05;
+        cmd_vel_pub.publish(cmd_vel);
+        sleep(1);
+        cmd_vel.linear.y = -0.05;
+        cmd_vel_pub.publish(cmd_vel);
+    }
 }
 
 /* 
@@ -246,7 +253,7 @@ FloorSet FSM::exit_elevator() {
     tmp.data = state;
     state_pub.publish(tmp);
 
-    // Exit elevator slowly
+    // Exit elevator by moving forward slowly
     // TODO: confirm this velocity
     cmd_vel.linear.y = 0.05;
     cmd_vel_pub.publish(cmd_vel);
@@ -306,12 +313,14 @@ void FSM::odomResponse(const nav_msgs::Odometry odom) {
     float yaw_old = (float)tf::getYaw(FSM::quat_old);
 
     // force yaws to always be within range [-pi, pi]
-    // see: https://github.com/ManickYoj/warmup_project_2017/blob/master/scripts/utils.py
+    // see wrapPi(): 
+    //    https://github.com/ManickYoj/warmup_project_2017/blob/master/scripts/utils.py
     float pi_yn = atan2(sin(yaw_new), cos(yaw_new));
     float pi_yo = atan2(sin(yaw_old), cos(yaw_old));
 
     // calculate angle rotated
-    // see: https://github.com/ManickYoj/warmup_project_2017/blob/master/scripts/utils.py
+    // see diffAngle():
+    //    https://github.com/ManickYoj/warmup_project_2017/blob/master/scripts/utils.py
     float d1 = pi_yn - pi_yo;
     float d2 = 2*M_PI - abs(d1);
     if (d1 > 0) d2 = d2 * -1.0;
