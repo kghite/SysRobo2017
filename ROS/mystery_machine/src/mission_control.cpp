@@ -10,6 +10,7 @@
 #include "string"
 #include "list"
 #include "iostream"
+#include "math.h"
 
 #include "ros/ros.h"
 #include "geometry_msgs/Pose.h"
@@ -20,6 +21,7 @@
 #include "sensor_msgs/LaserScan.h"
 #include "std_msgs/Int8.h"
 #include "std_msgs/Int16.h"
+#include "tf/transform_datatypes.h"
 
 // Set up state values
 enum State {
@@ -57,10 +59,18 @@ class FSM {
     public:  
         State state;
 
-        // declaring information resulting from callbacks
+        // declaring scanResponse info
         bool scan_changes;
         std::vector<float> scan_old;
         std::vector<float> scan_new;
+
+        // declaring odomResponse info
+        float dist_traveled;
+        float ang_traveled;
+        geometry_msgs::Point pos_old;
+        geometry_msgs::Point pos_new;
+        geometry_msgs::Quaternion quat_old;
+        geometry_msgs::Quaternion quat_new;
 
         // declaring constructor for FSM, which takes arg 'ROS node handler'
         FSM(ros::NodeHandle n);
@@ -69,7 +79,7 @@ class FSM {
         geometry_msgs::PoseStamped current_pose;
         geometry_msgs::Pose goal_pose;
         geometry_msgs::Twist cmd_vel;
-        nav_msgs::Odometry odom;
+        // nav_msgs::Odometry odom;
         sensor_msgs::LaserScan scan;
         std_msgs::Int8 floor;
 
@@ -93,6 +103,7 @@ class FSM {
 
         // declaring callback methods
         void scanResponse(sensor_msgs::LaserScan scan);
+        void odomResponse(nav_msgs::Odometry odom);
 };
 
 /*
@@ -171,7 +182,7 @@ void FSM::call_elevator() {
     tmp.data = state;
     state_pub.publish(tmp);
 
-    // Rock back and forth
+    // TODO: Rock back and forth
 
 }
 
@@ -188,7 +199,8 @@ void FSM::enter_elevator() {
     tmp.data = state;
     state_pub.publish(tmp);
 
-    // Enter elevator slowly (assume right-angle navigation)
+    // Enter elevator slowly
+    // TODO: how to set wpt to elevator???
     // TODO: confirm this velocity
     cmd_vel.linear.y = 0.001;
     cmd_vel_pub.publish(cmd_vel);
@@ -240,14 +252,14 @@ FloorSet FSM::exit_elevator() {
     cmd_vel.linear.y = 0.05;
     cmd_vel_pub.publish(cmd_vel);
 
-    // TODO: format odom correctly to track y dist traveled
-    // // Once bot has exited elevator, stop
-    // if (odom < 2) {
-    //     cmd_vel.linear.y = 0;
-    //     cmd_vel_pub.publish(cmd_vel);
-    // }
+    // Once bot has exited elevator, stop
+    float y_dist_traveled = abs(FSM::pos_new.y - FSM::pos_old.y);
+    if (y_dist_traveled > 2) {
+        cmd_vel.linear.y = 0;
+        cmd_vel_pub.publish(cmd_vel);
+    }
 
-    // Map matching behavior goes here.
+    // TODO: Map matching behavior goes here.
 
 }
 
@@ -264,9 +276,7 @@ Floor FSM::map_matching() {
 
 void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
 
-    // TODO: don't forget to initialize scan_new, scan_old, and scan_bool in "init" method above
-
-    // set incoming data to scan_new
+    // set incoming data to object's scan_new attr
     FSM::scan_new = scan.ranges;
 
     // compare to scan_old, setting bool scan_changes appropriately
@@ -280,7 +290,39 @@ void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
     FSM::scan_old = FSM::scan_new;
 }
 
-void odomResponse(const nav_msgs::Odometry odom) {
+void FSM::odomResponse(const nav_msgs::Odometry odom) {
+
+    // set incoming data to object's new attrs
+    FSM::pos_new = odom.pose.pose.position;
+    FSM::quat_new = odom.pose.pose.orientation;
+
+    // calculate distance traveled
+    float x_diff = FSM::pos_new.x - FSM::pos_old.x;
+    float y_diff = FSM::pos_new.y - FSM::pos_old.y;
+    FSM::dist_traveled = sqrt(pow(x_diff, 2) + pow(y_diff, 2));
+
+    
+
+    // get yaws
+    float yaw_new = (float)tf::getYaw(FSM::quat_new);
+    float yaw_old = (float)tf::getYaw(FSM::quat_old);
+
+    // force yaws to always be within range [-pi, pi]
+    // see: https://github.com/ManickYoj/warmup_project_2017/blob/master/scripts/utils.py
+    float pi_yn = atan2(sin(yaw_new), cos(yaw_new));
+    float pi_yo = atan2(sin(yaw_old), cos(yaw_old));
+
+    // calculate angle rotated
+    // see: https://github.com/ManickYoj/warmup_project_2017/blob/master/scripts/utils.py
+    float d1 = pi_yn - pi_yo;
+    float d2 = 2*M_PI - abs(d1);
+    if (d1 > 0) d2 = d2 * -1.0;
+    if (abs(d1) < abs(d2)) FSM::ang_traveled = d1;
+    else FSM::ang_traveled = d2;
+
+    // set pose_new to old attrs
+    FSM::pos_old = FSM::pos_new;
+    FSM::quat_old = FSM::quat_new;
 
 }
 
@@ -306,7 +348,7 @@ int main(int argc, char **argv) {
 
     // TODO: confirm rate for the following subscribers
     ros::Subscriber sub_scan = n.subscribe("/scan", 200, &FSM::scanResponse, &mission_controller);
-    ros::Subscriber sub_odom = n.subscribe("/odom", 200, odomResponse);
+    ros::Subscriber sub_odom = n.subscribe("/odom", 200, &FSM::odomResponse, &mission_controller);
 
     ros::spin();
 
