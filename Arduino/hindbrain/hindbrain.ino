@@ -83,6 +83,8 @@ int right_encoder_pin_A = 20;
 int right_encoder_pin_B = 21;
 long right_encoder_pos = 0;
 boolean right_encoder_updated = false;
+const int MAX_ENCODER_VAL = 32767;
+const int MIN_ENCODER_VAL = -32768;
 
 
 // Set up ROS node handling and feedback channel
@@ -99,11 +101,11 @@ ros::Publisher ir_estop_publisher("ir_estop", &ir_estop_msg);
 geometry_msgs::PointStamped sonar_data_msg;
 ros::Publisher sonar_data_publisher("sonar_data", &sonar_data_msg);
 
-std_msgs::Int32 left_encoder_msg;
-ros::Publisher left_encoder_publisher("left_encoder", &left_encoder_msg);
+std_msgs::Int16 left_encoder_msg;
+ros::Publisher left_encoder_publisher("lwheel", &left_encoder_msg);
 
-std_msgs::Int32 right_encoder_msg;
-ros::Publisher right_encoder_publisher("right_encoder", &right_encoder_msg);
+std_msgs::Int16 right_encoder_msg;
+ros::Publisher right_encoder_publisher("rwheel", &right_encoder_msg);
 
 
 // Various variables for ROS workings
@@ -275,10 +277,22 @@ void update_left_encoder() {
   int channel_A = digitalRead(left_encoder_pin_A);
   int channel_B = digitalRead(left_encoder_pin_B);
   if (channel_A == channel_B) {
-    left_encoder_pos++;
+    // Decrement encoder value unless it is at min, in which case it should wrap
+    if (left_encoder_pos <= MIN_ENCODER_VAL) {
+      left_encoder_pos = MAX_ENCODER_VAL;
+    }
+    else {
+      left_encoder_pos--;
+    }
   }
   else {
-    left_encoder_pos--;
+    // Increment encoder value unless it is at max, in which case it should wrap
+    if (left_encoder_pos >= MAX_ENCODER_VAL) {
+      left_encoder_pos = MIN_ENCODER_VAL;
+    }
+    else {
+      left_encoder_pos++;
+    }
   }
   
   left_encoder_updated = true;
@@ -289,10 +303,22 @@ void update_right_encoder() {
   int channel_A = digitalRead(right_encoder_pin_A);
   int channel_B = digitalRead(right_encoder_pin_B);
   if (channel_A == channel_B) {
-    right_encoder_pos++;
+    // Increment encoder value unless it is at max, in which case it should wrap
+    if (right_encoder_pos >= MAX_ENCODER_VAL) {
+      right_encoder_pos = MIN_ENCODER_VAL;
+    }
+    else {
+      right_encoder_pos++;
+    }
   }
   else {
-    right_encoder_pos--;
+    // Decrement encoder value unless it is at min, in which case it should wrap
+    if (right_encoder_pos <= MIN_ENCODER_VAL) {
+      right_encoder_pos = MAX_ENCODER_VAL;
+    }
+    else {
+      right_encoder_pos--;
+    }
   }
   
   right_encoder_updated = true;

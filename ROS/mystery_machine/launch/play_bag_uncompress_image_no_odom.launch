@@ -1,0 +1,17 @@
+<launch>
+
+    <!-- Use simulation time according to /clock topic from bag file -->
+    <param name="/use_sim_time" value="true" />
+
+    <!-- Play the specified bag file -->
+    <arg name="path" default="$(find mystery_machine)/bags/" />
+    <arg name="bag" default="data_collect_with_camera_no_odom.bag" />
+    <arg name="rate" default="1" />
+    <node pkg="rosbag" type="play" name="player"
+        args="--clock $(arg path)$(arg bag) -l --rate=$(arg rate)"/>
+
+    <!-- Uncompress the image stream from the bag file -->
+    <node name="uncompress_node" pkg="image_transport" type="republish"
+        args="in:=/image_raw compressed out:=/camera/image_raw raw" />
+              
+  </launch>
