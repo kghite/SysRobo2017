@@ -58,6 +58,7 @@ class FSM {
 
     public:  
         State state;
+        float vel;   // velocity parameter
 
         // declaring scanResponse info
         bool scan_changes;
@@ -87,7 +88,6 @@ class FSM {
         ros::Publisher state_pub;
         ros::Publisher cmd_vel_pub;
 
-
         // declaring methods
         float explore_floor();
         geometry_msgs::Pose find_elevator(nav_msgs::OccupancyGrid search_map);
@@ -113,10 +113,10 @@ FSM::FSM(ros::NodeHandle n) {
 
     // initializing
     state = exploring;
+    vel = 0.05;   // TODO: confirm this velocity
     cmd_vel = geometry_msgs::Twist();
     scan_changes = 0;   // 0 = no change; 1 = changed
-    // scan_old[512] = 0;
-    // scan_new[512] = 0;
+
 
     // declaring & initializing publishers
     state_pub = ros::Publisher(n.advertise<std_msgs::Int8>("/bot_state", 1000));
@@ -184,7 +184,7 @@ void FSM::call_elevator() {
 
     // Rock back and forth
     // TODO: check while condition w/ Katie & Shane
-    while {
+    while(state) {
         cmd_vel.linear.y = 0.05;
         cmd_vel_pub.publish(cmd_vel);
         sleep(1);
@@ -209,7 +209,7 @@ void FSM::enter_elevator() {
     // Enter elevator slowly
     // TODO: how to set wpt to elevator???
     // TODO: confirm this velocity
-    cmd_vel.linear.y = 0.001;
+    cmd_vel.linear.y = FSM::vel;
     cmd_vel_pub.publish(cmd_vel);
 
     // Once 1m from elevator’s back wall: stop and rotate 180 to face elevator doors
@@ -219,7 +219,7 @@ void FSM::enter_elevator() {
         cmd_vel_pub.publish(cmd_vel);
 
         // rotate bot
-        cmd_vel.angular.z = 0.01;   // TODO: confirm this velocity
+        cmd_vel.angular.z = FSM::vel;   // TODO: confirm this velocity
         cmd_vel_pub.publish(cmd_vel);
 
         // stop rotating once we've gone 180
@@ -255,7 +255,7 @@ FloorSet FSM::exit_elevator() {
 
     // Exit elevator by moving forward slowly
     // TODO: confirm this velocity
-    cmd_vel.linear.y = 0.05;
+    cmd_vel.linear.y = FSM::vel;
     cmd_vel_pub.publish(cmd_vel);
 
     // Once bot has exited elevator, stop
