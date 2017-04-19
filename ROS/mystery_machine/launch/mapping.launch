@@ -2,7 +2,11 @@
 
     <!-- Gmapping -->
     <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" >
-            <param name="scan" value="scan" />
+            <remap from="scan" to="merged_scan" />
+            <rosparam>
+                <!-- Read in a new scan every .1 seconds, even if stationary -->
+                temporalUpdate: .1
+            </rosparam>
     </node>
 
 </launch>

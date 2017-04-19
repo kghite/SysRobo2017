@@ -57,13 +57,14 @@ int current_angular_vel = 0;
 // Pins and servo objects for sonar sensor
 const byte SONAR_PIN = A7;
 const byte SONAR_PAN_PIN = 45;
+const int SONAR_RUN_AVG_LEN = 10;
 
 Adafruit_TiCoServo sonar_pan_servo;
 
 // Variables for panning sonar servo
 int sonar_pan_angle = 90;
 unsigned long time_of_last_sonar_pan = millis();
-int sonar_pan_time_interval = 10;
+int sonar_pan_time_interval = 15;
 int sonar_pan_angle_increment = 1;
 float sonar_reading;
 int sonar_point_id = 0;
@@ -147,7 +148,8 @@ ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("cmd_vel", &twistCb );
 
 
 // Callback function for an IR Estop message IRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCb
-void irEstopCallback( const std_msgs::Int16& int_input ){
+void irEstopCallback( const std_msgs::Int16& int_input ) {
+  
   // Check and see if the midbrain says it's okay to move
   int estop_message = int_input.data;
   
@@ -161,7 +163,8 @@ ros::Subscriber<std_msgs::Int16>ir_estop_sub("ir_estop",&irEstopCallback);
 
 
 // Callback function for an Odroid Estop message OCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcb
-void odroidEstopCallback( const std_msgs::Int16& int_input ){
+void odroidEstopCallback( const std_msgs::Int16& int_input ) {
+  
   // Just update this estop.. Pretty easy
   int estop_message = int_input.data;
   
@@ -172,7 +175,8 @@ ros::Subscriber<std_msgs::Int16>odroid_estop_sub("odroid_estop",&odroidEstopCall
 
 
 // SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
-void setup(){
+void setup() {
+  
   // Initialize timing things
   current_time = millis();
   blink_time   = millis();
@@ -234,9 +238,10 @@ void loop() {
   update_pan_and_read_sonar();
   
   // Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
-  if(digitalRead(ESTOP_PIN))
+  if (digitalRead(ESTOP_PIN)) {
     delay_period = 500;
-  else{
+  }
+  else {
     delay_period = 150;
   }
   
@@ -269,6 +274,7 @@ void loop() {
 // Hindbrain Helper Functions******************************************************************************
 // Writes a String message to the /debug topic
 void debug_print(String message) {
+  
   char charBuf[100];
   message.toCharArray(charBuf,100);    
   debug_msg.data = charBuf;
@@ -277,6 +283,7 @@ void debug_print(String message) {
 
 
 void update_left_encoder() {
+  
   int channel_A = digitalRead(left_encoder_pin_A);
   int channel_B = digitalRead(left_encoder_pin_B);
   if (channel_A == channel_B) {
@@ -303,6 +310,7 @@ void update_left_encoder() {
 
 
 void update_right_encoder() {
+  
   int channel_A = digitalRead(right_encoder_pin_A);
   int channel_B = digitalRead(right_encoder_pin_B);
   if (channel_A == channel_B) {
@@ -329,7 +337,8 @@ void update_right_encoder() {
 
 
 // Update motor speeds
-void update_drive_motors(){
+void update_drive_motors() {
+  
   // The ir_estop is the only estop the Arduino has to tell itself to stop via software
   if (ir_estop == 1 || odroid_estop == 1){
    forward_channel.write(90);
@@ -389,7 +398,12 @@ void update_pan_and_read_sonar() {
     sonar_pan_servo.write(sonar_pan_angle);
     time_of_last_sonar_pan = millis();
   }
-  sonar_reading = analogRead(SONAR_PIN)/100.0;
+  // Running average of a few sonar readings
+  for (int i=0; i<SONAR_RUN_AVG_LEN; i++) {
+    sonar_reading += analogRead(SONAR_PIN)/100.0;
+    delay(1);
+  }
+  sonar_reading /= float(SONAR_RUN_AVG_LEN); // divide total by number of readings
   sonar_point_id ++;
   sonar_data_msg.header.seq = sonar_point_id;
   sonar_data_msg.header.stamp.sec = millis()/1000;
@@ -405,6 +419,7 @@ void update_pan_and_read_sonar() {
 
 // See if we need to estop based on IR input
 void check_ir_sensors() {
+  
   int ir_reading_1;
   int ir_reading_2;
   ir_reading_1 = analogRead(IR_PIN_1);
@@ -425,7 +440,6 @@ void check_ir_sensors() {
         ir_estop_publisher.publish(&ir_estop_msg);
       }
     }
-    
   }
   else{
     if (ir_estop != 0){
@@ -438,7 +452,8 @@ void check_ir_sensors() {
 
 
 // Blink all NeoPixels on and off
-void blink(){
+void blink() {
+
   current_time = millis();
   
   if(current_time - blink_time > delay_period){
@@ -478,7 +493,8 @@ void blink(){
 
 
 // Helper function to make all NeoPixels a given color
-void change_all_colors(uint32_t color){
+void change_all_colors(uint32_t color) {
+  
   for (int i = 0; i < 8; i++)
   {
     left_strip.setPixelColor(i,color);
@@ -497,7 +513,8 @@ void change_all_colors(uint32_t color){
 
 
 // Helper functions for right and left banks of lights
-void change_left_colors(uint32_t color){
+void change_left_colors(uint32_t color) {
+  
   for (int i = 0; i < 8; i++)
   {
     left_strip.setPixelColor(i,color);
@@ -515,7 +532,8 @@ void change_left_colors(uint32_t color){
 }
 
 
-void change_right_colors(uint32_t color){
+void change_right_colors(uint32_t color) {
+  
   for (int i = 0; i < 8; i++)
   {
     left_strip.setPixelColor(i,off);
@@ -535,6 +553,7 @@ void change_right_colors(uint32_t color){
 
 // Helper function for attaching an interrupt to a pin
 int digital_pin_to_interrupt(int pin) {
+  
   switch(pin) {
     case 2:
       return 0;

@@ -1,6 +1,8 @@
 /*
- * Subscribe to the \sonar_data SonarScan message, turn it into a LaserScan
- * message attached to the base_sonar tf, and publish it as \sonar_transformed
+ * Subscribe to the /sonar_data SonarScan message, turn it into a LaserScan
+ * message attached to the base_sonar tf, and publish it as /sonar_scan.
+ * Insert the data from /sonar_data into /scan to create a merged LaserScan
+ * message of the lidar scan and the sonar scan called /merged_scan.
  */
 
 
@@ -12,8 +14,9 @@
 
 #define PI 3.14159265358979323846
 
-
-ros::Publisher pub;
+mystery_machine::SonarScan sonar_scan;
+ros::Publisher sonar_pub;
+ros::Publisher merged_pub;
 
 
 /*
@@ -23,6 +26,9 @@ ros::Publisher pub;
  * msg: SonarScan message from subscriber
  */
 void sonar_callback(mystery_machine::SonarScan msg) {
+
+    // Store the SonarScan message as a global
+    sonar_scan = msg;
 
     // Define LaserScan ranges[] attribute from SonarScan message
     std::vector <float> ranges;
@@ -45,8 +51,27 @@ void sonar_callback(mystery_machine::SonarScan msg) {
     sonar_laser_scan.range_max = msg.range_max;
     sonar_laser_scan.ranges = ranges;
 
+    // Publish the new LaserScan message
+    sonar_pub.publish(sonar_laser_scan);
+}
+
+
+/*
+ * Callback function for /scan topic. Creates a LaserScan message by joining
+ * /scan and /sonar_scan. Published to /merged_scan. The new LaserScan message
+ * can be used to create maps.
+ *
+ * msg: LaserScan message from subscriber
+ */
+void lidar_callback(sensor_msgs::LaserScan msg) {
+
+    // Insert the sonar scan data into the lidar scan
+    // 512 elements in lidar scan, 180 elements in sonar scan
+    int insert_index = 512 - round(sonar_scan.angle / 180.0 * 512.0);
+    msg.ranges[insert_index] = sonar_scan.range;
+
     // Publish the new PointStamped message
-    pub.publish(sonar_laser_scan);
+    merged_pub.publish(msg);
 }
 
 
@@ -55,9 +80,11 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "sonar_transform");
     ros::NodeHandle n;
 
-    ros::Subscriber sub = n.subscribe("sonar_data", 50, sonar_callback);
+    ros::Subscriber sonar_sub = n.subscribe("sonar_data", 50, sonar_callback);
+    ros::Subscriber lidar_sub = n.subscribe("scan", 50, lidar_callback);
 
-    pub = n.advertise<sensor_msgs::LaserScan>("sonar_scan", 10);
+    sonar_pub = n.advertise<sensor_msgs::LaserScan>("sonar_scan", 10);
+    merged_pub = n.advertise<sensor_msgs::LaserScan>("merged_scan", 10);
 
     ros::spin();
 }

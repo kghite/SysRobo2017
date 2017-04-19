@@ -1,2 +1,5 @@
 # Vim files
 *.swp
+
+# ROS bag files
+bags/
