@@ -211,16 +211,15 @@ void FSM::enter_elevator() {
         cmd_vel.linear.y = 0;
         cmd_vel_pub.publish(cmd_vel);
 
-        // rotate 180 deg
-        cmd_vel.angular.z = 0.01;
+        // rotate bot
+        cmd_vel.angular.z = 0.01;   // TODO: confirm this velocity
         cmd_vel_pub.publish(cmd_vel);
 
-        // TODO: format odom correctly to track angular change
-        // // stop rotating once we've gone 180
-        // if (odom == 180) {
-        //  cmd_vel.angular.z = 0;
-        //  cmd_vel_pub.publish(cmd_vel);
-        // }
+        // stop rotating once we've gone 180
+        if (FSM::ang_traveled == M_PI or FSM::ang_traveled == -M_PI) {
+         cmd_vel.angular.z = 0;
+         cmd_vel_pub.publish(cmd_vel);
+        }
     }
 }
 
@@ -302,7 +301,6 @@ void FSM::odomResponse(const nav_msgs::Odometry odom) {
     FSM::dist_traveled = sqrt(pow(x_diff, 2) + pow(y_diff, 2));
 
     
-
     // get yaws
     float yaw_new = (float)tf::getYaw(FSM::quat_new);
     float yaw_old = (float)tf::getYaw(FSM::quat_old);
