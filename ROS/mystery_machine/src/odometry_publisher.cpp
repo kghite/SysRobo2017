@@ -2,11 +2,13 @@
 #include <geometry_msgs/Vector3.h>
 #include <tf/transform_broadcaster.h>
 #include <nav_msgs/Odometry.h>
+#include <std_msgs/Int32.h>
 
-long _PreviousLeftEncoderCounts = 0;
-long _PreviousRightEncoderCounts = 0;
+long previous_left_encoder_counts = 0;
+long previous_right_encoder_counts = 0;
 ros::Time current_time_encoder, last_time_encoder;
-double DistancePerCount = (3.14159265 * 0.1524) / 168;
+double distance_per_count = (3.14159265 * 0.1524) / 168;
+double lengthBetweenTwoWheels = 0.31115;
 
 double x;
 double y;
@@ -18,90 +20,120 @@ double vth;
 double deltaLeft;
 double deltaRight;
 
-void WheelCallback(const geometry_msgs::Vector3::ConstPtr& ticks)
-{
-  // Break encoder message into sides
-  current_time_encoder = ros::Time::now();
+long left = 0;
+long right = 0;
 
-  deltaLeft = ticks->x - _PreviousLeftEncoderCounts;
-  deltaRight = ticks->y - _PreviousRightEncoderCounts;
+void updateDeltas() {
+    // Break encoder message into sides
+    current_time_encoder = ros::Time::now();
 
-  vx = deltaLeft * DistancePerCount; // (current_time_encoder - last_time_encoder).toSec();
-  vy = deltaRight * DistancePerCount; // (current_time_encoder - last_time_encoder).toSec();
+    deltaLeft = left - previous_left_encoder_counts;
+    deltaRight = right - previous_right_encoder_counts;
 
-  _PreviousLeftEncoderCounts = ticks->x;
-  _PreviousRightEncoderCounts = ticks->y;
-  last_time_encoder = current_time_encoder;
+    // (current_time_encoder - last_time_encoder).toSec();
+    vx = deltaLeft * distance_per_count;
+
+    // (current_time_encoder - last_time_encoder).toSec();
+    vy = deltaRight * distance_per_count;
+
+    vth = ((vy - vx)/lengthBetweenTwoWheels);
+
+    previous_left_encoder_counts = left;
+    previous_right_encoder_counts = right;
+    last_time_encoder = current_time_encoder;
 }
 
-int main(int argc, char **argv)
-{
-  ros::init(argc, argv, "odometry_publisher");
-  ros::NodeHandle n;
-  ros::Subscriber sub = n.subscribe("encoder_data", 100, WheelCallback);
-  ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("odom", 50);   
-  tf::TransformBroadcaster odom_broadcaster;
+void rightCallback(const std_msgs::Int32 right_ticks) {
+    ROS_INFO("Right: %d", right_ticks.data);
+    right = (long) right_ticks.data;
+}
 
+void leftCallback(const std_msgs::Int32 left_ticks) {
+    ROS_INFO("Left: %d", left_ticks.data);
+    left = -1.0 * (long) left_ticks.data;
+}
 
-  ros::Time current_time, last_time;
-  current_time = ros::Time::now();
-  last_time = ros::Time::now();
+int main(int argc, char **argv) {
 
+    ros::init(argc, argv, "odometry_publisher");
+    ros::NodeHandle n;
 
-  ros::Rate r(1.0);
-  while(n.ok()){
+    ros::Subscriber sub_left = n.subscribe("/left_encoder", 100,
+        leftCallback);
+    ros::Subscriber sub_right = n.subscribe("/right_encoder", 100,
+        rightCallback);
 
+    ros::Publisher odom_pub = n.advertise<nav_msgs::Odometry>("/odom", 50);   
+    tf::TransformBroadcaster odom_broadcaster;
+
+    ros::Time current_time, last_time;
     current_time = ros::Time::now();
+    last_time = ros::Time::now();
 
-    //compute odometry in a typical way given the velocities of the robot
-    double dt = (current_time - last_time).toSec();
-    double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
-    double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
-    double delta_th = vth * dt;
+    ros::Rate r(1.0);
+    while(n.ok()){
 
-    x += delta_x;
-    y += delta_y;
-    th += delta_th;
+        current_time = ros::Time::now();
 
-    //since all odometry is 6DOF we'll need a quaternion created from yaw
-    geometry_msgs::Quaternion odom_quat = tf::createQuaternionMsgFromYaw(th);
+        updateDeltas();
 
-    //first, we'll publish the transform over tf
-    geometry_msgs::TransformStamped odom_tf;
-    odom_tf.header.stamp = current_time;
-    odom_tf.header.frame_id = "odom";
-    odom_tf.child_frame_id = "base_link";
+        //compute odometry in a typical way given the velocities of the robot
+        double dt = (current_time - last_time).toSec();
+        double delta_x = (vx * cos(th) - vy * sin(th)) * dt;
+        double delta_y = (vx * sin(th) + vy * cos(th)) * dt;
+        double delta_th = vth * dt;
 
-    odom_tf.transform.translation.x = x;
-    odom_tf.transform.translation.y = y;
-    odom_tf.transform.translation.z = 0.0;
-    odom_tf.transform.rotation = odom_quat;
+        //ROS_INFO("th: %f \n", th);
+        //ROS_INFO("dt: %f", dt);
+        //ROS_INFO("dx: %f \n", delta_x);
+        //ROS_INFO("dy: %f \n", delta_y);
+        //ROS_INFO("dth: %f \n \n", delta_th);
 
-    //send the transform
-    odom_broadcaster.sendTransform(odom_tf);
+        x += delta_x;
+        y += delta_y;
+        th += delta_th;
 
-    //next, we'll publish the odometry message over ROS
-    nav_msgs::Odometry odom;
-    odom.header.stamp = current_time;
-    odom.header.frame_id = "odom";
+        //since all odometry is 6DOF we'll need a quaternion created from yaw
+        geometry_msgs::Quaternion odom_quat =
+            tf::createQuaternionMsgFromYaw(th);
 
-    //set the position
-    odom.pose.pose.position.x = x;
-    odom.pose.pose.position.y = y;
-    odom.pose.pose.position.z = 0.0;
-    odom.pose.pose.orientation = odom_quat;
+        //first, we'll publish the transform over tf
+        geometry_msgs::TransformStamped odom_tf;
+        odom_tf.header.stamp = current_time;
+        odom_tf.header.frame_id = "odom";
+        odom_tf.transform.translation.z = 0.0;
+        odom_tf.child_frame_id = "base_link";
 
-    //set the velocity
-    odom.child_frame_id = "base_link";
-    odom.twist.twist.linear.x = vx;
-    odom.twist.twist.linear.y = vy;
-    odom.twist.twist.angular.z = vth;
+        odom_tf.transform.translation.x = x;
+        odom_tf.transform.translation.y = y;
+        odom_tf.transform.translation.z = 0.0;
+        odom_tf.transform.rotation = odom_quat;
 
-    //publish the message
-    odom_pub.publish(odom);
+        //send the transform
+        odom_broadcaster.sendTransform(odom_tf);
 
-    last_time = current_time;
-    r.sleep();
-    ros::spinOnce;
-  }
+        //next, we'll publish the odometry message over ROS
+        nav_msgs::Odometry odom;
+        odom.header.stamp = current_time;
+        odom.header.frame_id = "odom";
+
+        //set the position
+        odom.pose.pose.position.x = x;
+        odom.pose.pose.position.y = y;
+        odom.pose.pose.position.z = 0.0;
+        odom.pose.pose.orientation = odom_quat;
+
+        //set the velocity
+        odom.child_frame_id = "base_link";
+        odom.twist.twist.linear.x = vx;
+        odom.twist.twist.linear.y = vy;
+        odom.twist.twist.angular.z = vth;
+
+        //publish the message
+        odom_pub.publish(odom);
+
+        last_time = current_time;
+        r.sleep();
+        ros::spinOnce();
+    }
 }

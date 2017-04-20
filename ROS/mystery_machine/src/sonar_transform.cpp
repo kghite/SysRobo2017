@@ -1,58 +1,91 @@
-#include "ros/ros.h"
-#include "tf/transform_listener.h"
-#include "sensor_msgs/PointCloud.h"
+/*
+ * Subscribe to the /sonar_data SonarScan message, turn it into a LaserScan
+ * message attached to the base_sonar tf, and publish it as /sonar_scan.
+ * Insert the data from /sonar_data into /scan to create a merged LaserScan
+ * message of the lidar scan and the sonar scan called /merged_scan.
+ */
+
+
 #include <ros/ros.h>
-#include <geometry_msgs/PointStamped.h>
-#include <tf/transform_listener.h>
+#include <mystery_machine/SonarScan.h>
+#include <sensor_msgs/LaserScan.h>
+#include <math.h>
 
-geometry_msgs::PointStamped sonar_point;
-ros::Publisher *pub;
 
-// Subscriber callback for sonar
-void getSonar(const geometry_msgs::PointStamped sonar) {
-  // Set global reference to angular message input
-  sonar_point = sonar;
+#define PI 3.14159265358979323846
+
+mystery_machine::SonarScan sonar_scan;
+ros::Publisher sonar_pub;
+ros::Publisher merged_pub;
+
+
+/*
+ * Callback function for /sonar_data topic. Creates a LaserScan message from a
+ * SonarScan message. The new LaserScan message can be used to create maps.
+ *
+ * msg: SonarScan message from subscriber
+ */
+void sonar_callback(mystery_machine::SonarScan msg) {
+
+    // Store the SonarScan message as a global
+    sonar_scan = msg;
+
+    // Define LaserScan ranges[] attribute from SonarScan message
+    std::vector <float> ranges;
+    float curr_range;
+    for (int i=0; i<180; i++) {
+        curr_range = (i==msg.angle) ? msg.range : 0;
+        ranges.push_back(curr_range);
+    }
+
+    // Create the new LaserScan message from the SonarScan message
+    sensor_msgs::LaserScan sonar_laser_scan;
+    sonar_laser_scan.header = msg.header;
+    sonar_laser_scan.header.stamp = ros::Time::now();
+    sonar_laser_scan.angle_min = 0;
+    sonar_laser_scan.angle_max = PI;
+    sonar_laser_scan.angle_increment = PI/179.0;
+    sonar_laser_scan.time_increment = .05/180.0;
+    sonar_laser_scan.scan_time = .05;
+    sonar_laser_scan.range_min = msg.range_min;
+    sonar_laser_scan.range_max = msg.range_max;
+    sonar_laser_scan.ranges = ranges;
+
+    // Publish the new LaserScan message
+    sonar_pub.publish(sonar_laser_scan);
 }
 
-void transformPoint(const tf::TransformListener& listener){
- ROS_INFO("base_sonar: (%.2f, %.2f. %.2f)",
-        sonar_point.point.x, sonar_point.point.y, sonar_point.point.z);
 
-  sonar_point.header.frame_id = "base_sonar";
-  sonar_point.header.stamp = ros::Time();
-  sonar_point.point.x = sonar_point.point.x / 100;
-  sonar_point.point.y = sonar_point.point.y / 100;
-  sonar_point.point.z = sonar_point.point.z / 100;
+/*
+ * Callback function for /scan topic. Creates a LaserScan message by joining
+ * /scan and /sonar_scan. Published to /merged_scan. The new LaserScan message
+ * can be used to create maps.
+ *
+ * msg: LaserScan message from subscriber
+ */
+void lidar_callback(sensor_msgs::LaserScan msg) {
 
-  try{
-    geometry_msgs::PointStamped base_point;
-    listener.transformPoint("base_link", sonar_point, base_point);
+    // Insert the sonar scan data into the lidar scan
+    // 512 elements in lidar scan, 180 elements in sonar scan
+    int insert_index = 512 - round(sonar_scan.angle / 180.0 * 512.0);
+    msg.ranges[insert_index] = sonar_scan.range;
 
-    ROS_INFO("base_sonar: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
-        sonar_point.point.x, sonar_point.point.y, sonar_point.point.z,
-        base_point.point.x, base_point.point.y, base_point.point.z, base_point.header.stamp.toSec());
-  
-    pub->publish(base_point);
-  }
-  catch(tf::TransformException& ex){
-    ROS_ERROR("Received an exception trying to transform a point from \"base_sonar\" to \"base_link\": %s", ex.what());
-  }
-
+    // Publish the new PointStamped message
+    merged_pub.publish(msg);
 }
 
-int main(int argc, char** argv){
-  ros::init(argc, argv, "sonar_transform");
-  ros::NodeHandle n;
 
-  ros::Subscriber sub_ang = n.subscribe("sonar_data", 50, getSonar);
+int main(int argc, char** argv) {
 
-  tf::TransformListener listener(ros::Duration(10));
+    ros::init(argc, argv, "sonar_transform");
+    ros::NodeHandle n;
 
-  //we'll transform a point once every second
-  ros::Timer timer = n.createTimer(ros::Duration(0.5), boost::bind(&transformPoint, boost::ref(listener)));
+    ros::Subscriber sonar_sub = n.subscribe("sonar_data", 50, sonar_callback);
+    ros::Subscriber lidar_sub = n.subscribe("scan", 50, lidar_callback);
 
-  pub = new ros::Publisher(n.advertise<geometry_msgs::PointStamped>("sonar_transformed", 50));
+    sonar_pub = n.advertise<sensor_msgs::LaserScan>("sonar_scan", 10);
+    merged_pub = n.advertise<sensor_msgs::LaserScan>("merged_scan", 10);
 
-  ros::spin();
-
+    ros::spin();
 }
+

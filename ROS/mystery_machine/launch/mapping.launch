@@ -1,58 +1,12 @@
 <launch>
 
-    <!-- ARDUINO -->        
-
-    <!-- Rosserial -->
-    <arg name="arduino_port" default="/dev/ttyACM0" />
-    <node pkg="rosserial_python" type="serial_node.py" name="serial_node"
-        args="$(arg arduino_port)" />
-
-
-    <!-- SENSORS -->
-
-    <!-- Lidar -->
-    <arg name="lidar_port" default="/dev/ttyACM1" />
-    <node pkg="hokuyo_node" type="hokuyo_node" name="hokuyo_node" >
-        <param name="port" value="$(arg lidar_port)" />
-        <param name="frame_id" value="/laser"/>
-    </node>
-
-
-    <!-- TRANSFORMS -->
-
-    <!-- Lidar Transform -->
-    <node pkg="mystery_machine" type="lidar_tf_publisher"
-        name="lidar_tf_publisher" />
-
-    <!-- Sonar Transform -->
-    <node pkg="mystery_machine" type="sonar_tf_publisher"
-        name="sonar_tf_publisher" />
-
-    <!-- Transformed Sonar Publisher -->
-    <node pkg="mystery_machine" type="sonar_transform"
-        name="sonar_transform" />
-
-    <!-- Odometry Publisher -->
-    <node pkg="mystery_machine" type="odometry_publisher"
-        name="odometry_publisher" />
-
-
-    <!-- MAPPING -->
-
-    <!-- Multi Map Nav -->
-    <!-- <node pkg="multi_map_navigation" type="multi_map_navigation" name="multi_map_navigation" output="screen">
-            <param name="definition_file" value="YAML" />
-            <param name="transition_types" value="TYPES" />
-            </node> -->
-
     <!-- Gmapping -->
     <node pkg="gmapping" type="slam_gmapping" name="slam_gmapping" >
-            <param name="scan" value="scan" />
+            <remap from="scan" to="merged_scan" />
+            <rosparam>
+                <!-- Read in a new scan every .1 seconds, even if stationary -->
+                temporalUpdate: .1
+            </rosparam>
     </node>
-
-
-    <!-- Teleop -->
-    <node pkg="teleop_twist_keyboard" type="teleop_twist_keyboard.py"
-        name="teleop_twist_keyboard" />
 
 </launch>
