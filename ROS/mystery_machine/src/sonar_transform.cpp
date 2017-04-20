@@ -14,7 +14,6 @@
 #define PI 3.14159265358979323846
 
 mystery_machine::SonarScan sonar_scan;
-ros::Publisher sonar_pub;
 ros::Publisher merged_pub;
 
 
