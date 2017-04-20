@@ -1,8 +1,7 @@
 /*
- * Subscribe to the /sonar_data SonarScan message, turn it into a LaserScan
- * message attached to the base_sonar tf, and publish it as /sonar_scan.
- * Insert the data from /sonar_data into /scan to create a merged LaserScan
- * message of the lidar scan and the sonar scan called /merged_scan.
+ * Subscribe to the /sonar_data SonarScan message, insert the data from
+ * /sonar_data into /scan to create a merged LaserScan message of the lidar
+ * scan and the sonar scan called /merged_scan.
  */
 
 
@@ -20,8 +19,7 @@ ros::Publisher merged_pub;
 
 
 /*
- * Callback function for /sonar_data topic. Creates a LaserScan message from a
- * SonarScan message. The new LaserScan message can be used to create maps.
+ * Callback function for /sonar_data topic. Stores the SonarScan as a global.
  *
  * msg: SonarScan message from subscriber
  */
@@ -29,30 +27,6 @@ void sonar_callback(mystery_machine::SonarScan msg) {
 
     // Store the SonarScan message as a global
     sonar_scan = msg;
-
-    // Define LaserScan ranges[] attribute from SonarScan message
-    std::vector <float> ranges;
-    float curr_range;
-    for (int i=0; i<180; i++) {
-        curr_range = (i==msg.angle) ? msg.range : 0;
-        ranges.push_back(curr_range);
-    }
-
-    // Create the new LaserScan message from the SonarScan message
-    sensor_msgs::LaserScan sonar_laser_scan;
-    sonar_laser_scan.header = msg.header;
-    sonar_laser_scan.header.stamp = ros::Time::now();
-    sonar_laser_scan.angle_min = 0;
-    sonar_laser_scan.angle_max = PI;
-    sonar_laser_scan.angle_increment = PI/179.0;
-    sonar_laser_scan.time_increment = .05/180.0;
-    sonar_laser_scan.scan_time = .05;
-    sonar_laser_scan.range_min = msg.range_min;
-    sonar_laser_scan.range_max = msg.range_max;
-    sonar_laser_scan.ranges = ranges;
-
-    // Publish the new LaserScan message
-    sonar_pub.publish(sonar_laser_scan);
 }
 
 
@@ -65,25 +39,36 @@ void sonar_callback(mystery_machine::SonarScan msg) {
  */
 void lidar_callback(sensor_msgs::LaserScan msg) {
 
-    // Insert the sonar scan data into the lidar scan
-    // 512 elements in lidar scan, 180 elements in sonar scan
-    int insert_index = 512 - round(sonar_scan.angle / 180.0 * 512.0);
-    msg.ranges[insert_index] = sonar_scan.range;
+    // Define the viable range of the sonar (in meters)
+    float sonar_min_range = 0.0;
+    float sonar_max_range = 2.0;
 
-    // Publish the new PointStamped message
+    // If the sonar reading is within the viable range of the sonar
+    if (sonar_min_range <= sonar_scan.range &&
+            sonar_scan.range <= sonar_max_range) {
+
+        // Insert the sonar scan data into the lidar scan
+        // 512 elements in lidar scan, 180 elements in sonar scan
+        int insert_index = 512 - round(sonar_scan.angle / 180.0 * 512.0);
+        msg.ranges[insert_index] = sonar_scan.range;
+    }
+
+    // Publish the new merged LaserScan message
     merged_pub.publish(msg);
 }
 
 
 int main(int argc, char** argv) {
 
+    // Initialize ros node
     ros::init(argc, argv, "sonar_transform");
     ros::NodeHandle n;
 
+    // Initialize subscribers to sonar and lidar data
     ros::Subscriber sonar_sub = n.subscribe("sonar_data", 50, sonar_callback);
     ros::Subscriber lidar_sub = n.subscribe("scan", 50, lidar_callback);
 
-    sonar_pub = n.advertise<sensor_msgs::LaserScan>("sonar_scan", 10);
+    // Initialize publisher for merged scan topic
     merged_pub = n.advertise<sensor_msgs::LaserScan>("merged_scan", 10);
 
     ros::spin();
