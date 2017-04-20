@@ -359,8 +359,8 @@ int main(int argc, char **argv) {
 
 
     // declaring & initializing publishers
-    state_pub = ros::Publisher(n.advertise<std_msgs::Int8>("/bot_state", 1000));
-    cmd_vel_pub = ros::Publisher(n.advertise<geometry_msgs::Twist>("/cmd_vel", 500));
+    state_pub = n.advertise<std_msgs::Int8>("/bot_state", 1000);
+    cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 500);
 
 
 
