@@ -32,13 +32,37 @@ J	K 	L
 
 The following sections also detail running individual packages or sensor feeds from terminal.
 
-## Running the Robot
+
+## Setup
 
 #### Updating submodules
 
 Our repository contains other individual git repositories. To pull these repositories, run the following:
 
 `git submodule init && git submodule update`
+
+#### Installing ROS Dependencies
+
+Install all necessary rospackages and other dependencies for the `mystery_machine` package.
+
+` rosdep install -r --from-paths .`
+
+#### Building rosserial_arduino libraries
+
+Remove any pre-existing `ros_lib` directory.
+
+`rm -r <PATH_TO_ros_lib>`
+
+Typically, you can find `ros_lib` in `~/sketchbook/libraries`, so this command would be:
+
+`rm -r ~/sketchbook/libraries/ros_lib`
+
+Now, create the new `ros_lib` directory.
+
+`rosrun rosserial_arduino make_libraries.py ~/sketchbook/libraries`
+
+
+## Running the Robot
 
 #### SSH Into the Odroid
 
