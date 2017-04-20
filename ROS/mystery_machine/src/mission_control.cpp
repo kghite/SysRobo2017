@@ -45,8 +45,8 @@ struct Floor {
 // This is received from the wormhole stack, also.
 struct FloorSet {
     std::list<Floor> floor_order;
-    float probs[];
     float certainty;
+    float probs[];
 };
 
 
