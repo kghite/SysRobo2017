@@ -1,15 +1,18 @@
 #include <Adafruit_NeoPixel.h>
 #include <ros.h>
 #include <geometry_msgs/Twist.h>
+#include <geometry_msgs/Point.h>
+#include <sensor_msgs/LaserScan.h>
 #include <std_msgs/String.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32.h>
+#include <std_msgs/Float32MultiArray.h>
 #include <std_msgs/Header.h>
-#include <geometry_msgs/Point.h>
-#include <geometry_msgs/PointStamped.h>
 #include <Adafruit_TiCoServo.h>
+#include <mystery_machine/SonarScan.h>
 
 #define USB_CON
+#define PI 3.14159265358979323846
 
 // Global constants
 const float pi = 3.14159;
@@ -54,13 +57,14 @@ int current_angular_vel = 0;
 // Pins and servo objects for sonar sensor
 const byte SONAR_PIN = A7;
 const byte SONAR_PAN_PIN = 45;
+const int SONAR_RUN_AVG_LEN = 10;
 
 Adafruit_TiCoServo sonar_pan_servo;
 
 // Variables for panning sonar servo
 int sonar_pan_angle = 90;
 unsigned long time_of_last_sonar_pan = millis();
-int sonar_pan_time_interval = 50;
+int sonar_pan_time_interval = 15;
 int sonar_pan_angle_increment = 1;
 float sonar_reading;
 int sonar_point_id = 0;
@@ -83,6 +87,8 @@ int right_encoder_pin_A = 20;
 int right_encoder_pin_B = 21;
 long right_encoder_pos = 0;
 boolean right_encoder_updated = false;
+const int MAX_ENCODER_VAL = 32767;
+const int MIN_ENCODER_VAL = -32768;
 
 
 // Set up ROS node handling and feedback channel
@@ -96,14 +102,14 @@ ros::Publisher debug_publisher("debug", &debug_msg);
 std_msgs::Int16 ir_estop_msg;
 ros::Publisher ir_estop_publisher("ir_estop", &ir_estop_msg);
 
-geometry_msgs::PointStamped sonar_data_msg;
+mystery_machine::SonarScan sonar_data_msg;
 ros::Publisher sonar_data_publisher("sonar_data", &sonar_data_msg);
 
-std_msgs::Int32 left_encoder_msg;
-ros::Publisher left_encoder_publisher("left_encoder", &left_encoder_msg);
+std_msgs::Int16 left_encoder_msg;
+ros::Publisher left_encoder_publisher("lwheel", &left_encoder_msg);
 
-std_msgs::Int32 right_encoder_msg;
-ros::Publisher right_encoder_publisher("right_encoder", &right_encoder_msg);
+std_msgs::Int16 right_encoder_msg;
+ros::Publisher right_encoder_publisher("rwheel", &right_encoder_msg);
 
 
 // Various variables for ROS workings
@@ -119,7 +125,7 @@ int current_tilt_position = middle_tilt_position;
 
 
 // Callback function for a Twist message TCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCb
-void twistCb( const geometry_msgs::Twist& twist_input ){
+void twistCb( const geometry_msgs::Twist& twist_input ) {
   
   // Extract velocity data
   // Multiply by 90 to maintain resolution
@@ -142,7 +148,8 @@ ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("cmd_vel", &twistCb );
 
 
 // Callback function for an IR Estop message IRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCb
-void irEstopCallback( const std_msgs::Int16& int_input ){
+void irEstopCallback( const std_msgs::Int16& int_input ) {
+  
   // Check and see if the midbrain says it's okay to move
   int estop_message = int_input.data;
   
@@ -156,7 +163,8 @@ ros::Subscriber<std_msgs::Int16>ir_estop_sub("ir_estop",&irEstopCallback);
 
 
 // Callback function for an Odroid Estop message OCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcb
-void odroidEstopCallback( const std_msgs::Int16& int_input ){
+void odroidEstopCallback( const std_msgs::Int16& int_input ) {
+  
   // Just update this estop.. Pretty easy
   int estop_message = int_input.data;
   
@@ -167,7 +175,8 @@ ros::Subscriber<std_msgs::Int16>odroid_estop_sub("odroid_estop",&odroidEstopCall
 
 
 // SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
-void setup(){
+void setup() {
+  
   // Initialize timing things
   current_time = millis();
   blink_time   = millis();
@@ -229,9 +238,10 @@ void loop() {
   update_pan_and_read_sonar();
   
   // Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
-  if(digitalRead(ESTOP_PIN))
+  if (digitalRead(ESTOP_PIN)) {
     delay_period = 500;
-  else{
+  }
+  else {
     delay_period = 150;
   }
   
@@ -264,6 +274,7 @@ void loop() {
 // Hindbrain Helper Functions******************************************************************************
 // Writes a String message to the /debug topic
 void debug_print(String message) {
+  
   char charBuf[100];
   message.toCharArray(charBuf,100);    
   debug_msg.data = charBuf;
@@ -272,13 +283,26 @@ void debug_print(String message) {
 
 
 void update_left_encoder() {
+  
   int channel_A = digitalRead(left_encoder_pin_A);
   int channel_B = digitalRead(left_encoder_pin_B);
   if (channel_A == channel_B) {
-    left_encoder_pos++;
+    // Decrement encoder value unless it is at min, in which case it should wrap
+    if (left_encoder_pos <= MIN_ENCODER_VAL) {
+      left_encoder_pos = MAX_ENCODER_VAL;
+    }
+    else {
+      left_encoder_pos--;
+    }
   }
   else {
-    left_encoder_pos--;
+    // Increment encoder value unless it is at max, in which case it should wrap
+    if (left_encoder_pos >= MAX_ENCODER_VAL) {
+      left_encoder_pos = MIN_ENCODER_VAL;
+    }
+    else {
+      left_encoder_pos++;
+    }
   }
   
   left_encoder_updated = true;
@@ -286,13 +310,26 @@ void update_left_encoder() {
 
 
 void update_right_encoder() {
+  
   int channel_A = digitalRead(right_encoder_pin_A);
   int channel_B = digitalRead(right_encoder_pin_B);
   if (channel_A == channel_B) {
-    right_encoder_pos++;
+    // Increment encoder value unless it is at max, in which case it should wrap
+    if (right_encoder_pos >= MAX_ENCODER_VAL) {
+      right_encoder_pos = MIN_ENCODER_VAL;
+    }
+    else {
+      right_encoder_pos++;
+    }
   }
   else {
-    right_encoder_pos--;
+    // Decrement encoder value unless it is at min, in which case it should wrap
+    if (right_encoder_pos <= MIN_ENCODER_VAL) {
+      right_encoder_pos = MAX_ENCODER_VAL;
+    }
+    else {
+      right_encoder_pos--;
+    }
   }
   
   right_encoder_updated = true;
@@ -300,7 +337,8 @@ void update_right_encoder() {
 
 
 // Update motor speeds
-void update_drive_motors(){
+void update_drive_motors() {
+  
   // The ir_estop is the only estop the Arduino has to tell itself to stop via software
   if (ir_estop == 1 || odroid_estop == 1){
    forward_channel.write(90);
@@ -360,21 +398,28 @@ void update_pan_and_read_sonar() {
     sonar_pan_servo.write(sonar_pan_angle);
     time_of_last_sonar_pan = millis();
   }
-  sonar_reading = analogRead(SONAR_PIN);
+  // Running average of a few sonar readings
+  for (int i=0; i<SONAR_RUN_AVG_LEN; i++) {
+    sonar_reading += analogRead(SONAR_PIN)/100.0;
+    delay(1);
+  }
+  sonar_reading /= float(SONAR_RUN_AVG_LEN); // divide total by number of readings
   sonar_point_id ++;
   sonar_data_msg.header.seq = sonar_point_id;
   sonar_data_msg.header.stamp.sec = millis()/1000;
   sonar_data_msg.header.stamp.nsec = (millis() * 1000) % 1000000;
-  sonar_data_msg.header.frame_id = GLOBAL_FRAME;
-  sonar_data_msg.point.x = cos(sonar_pan_angle*pi/180)*sonar_reading;
-  sonar_data_msg.point.y = sin(sonar_pan_angle*pi/180)*sonar_reading;
-  sonar_data_msg.point.z = 0;
+  sonar_data_msg.header.frame_id = "base_sonar";
+  sonar_data_msg.range_min = 0.05;
+  sonar_data_msg.range_max = 2.00;
+  sonar_data_msg.range = sonar_reading;
+  sonar_data_msg.angle = sonar_pan_angle; // angle in degrees where 0 is right and 180 is left
   sonar_data_publisher.publish(&sonar_data_msg);
 }
 
 
 // See if we need to estop based on IR input
-void check_ir_sensors(){
+void check_ir_sensors() {
+  
   int ir_reading_1;
   int ir_reading_2;
   ir_reading_1 = analogRead(IR_PIN_1);
@@ -395,7 +440,6 @@ void check_ir_sensors(){
         ir_estop_publisher.publish(&ir_estop_msg);
       }
     }
-    
   }
   else{
     if (ir_estop != 0){
@@ -408,7 +452,8 @@ void check_ir_sensors(){
 
 
 // Blink all NeoPixels on and off
-void blink(){
+void blink() {
+
   current_time = millis();
   
   if(current_time - blink_time > delay_period){
@@ -448,7 +493,8 @@ void blink(){
 
 
 // Helper function to make all NeoPixels a given color
-void change_all_colors(uint32_t color){
+void change_all_colors(uint32_t color) {
+  
   for (int i = 0; i < 8; i++)
   {
     left_strip.setPixelColor(i,color);
@@ -467,7 +513,8 @@ void change_all_colors(uint32_t color){
 
 
 // Helper functions for right and left banks of lights
-void change_left_colors(uint32_t color){
+void change_left_colors(uint32_t color) {
+  
   for (int i = 0; i < 8; i++)
   {
     left_strip.setPixelColor(i,color);
@@ -485,7 +532,8 @@ void change_left_colors(uint32_t color){
 }
 
 
-void change_right_colors(uint32_t color){
+void change_right_colors(uint32_t color) {
+  
   for (int i = 0; i < 8; i++)
   {
     left_strip.setPixelColor(i,off);
@@ -505,6 +553,7 @@ void change_right_colors(uint32_t color){
 
 // Helper function for attaching an interrupt to a pin
 int digital_pin_to_interrupt(int pin) {
+  
   switch(pin) {
     case 2:
       return 0;

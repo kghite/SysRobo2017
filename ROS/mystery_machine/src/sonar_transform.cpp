@@ -1,58 +1,75 @@
-#include "ros/ros.h"
-#include "tf/transform_listener.h"
-#include "sensor_msgs/PointCloud.h"
+/*
+ * Subscribe to the /sonar_data SonarScan message, insert the data from
+ * /sonar_data into /scan to create a merged LaserScan message of the lidar
+ * scan and the sonar scan called /merged_scan.
+ */
+
+
 #include <ros/ros.h>
-#include <geometry_msgs/PointStamped.h>
-#include <tf/transform_listener.h>
+#include <mystery_machine/SonarScan.h>
+#include <sensor_msgs/LaserScan.h>
+#include <math.h>
 
-geometry_msgs::PointStamped sonar_point;
-ros::Publisher *pub;
 
-// Subscriber callback for sonar
-void getSonar(const geometry_msgs::PointStamped sonar) {
-  // Set global reference to angular message input
-  sonar_point = sonar;
+#define PI 3.14159265358979323846
+
+mystery_machine::SonarScan sonar_scan;
+ros::Publisher merged_pub;
+
+
+/*
+ * Callback function for /sonar_data topic. Stores the SonarScan as a global.
+ *
+ * msg: SonarScan message from subscriber
+ */
+void sonar_callback(mystery_machine::SonarScan msg) {
+
+    // Store the SonarScan message as a global
+    sonar_scan = msg;
 }
 
-void transformPoint(const tf::TransformListener& listener){
- ROS_INFO("base_sonar: (%.2f, %.2f. %.2f)",
-        sonar_point.point.x, sonar_point.point.y, sonar_point.point.z);
 
-  sonar_point.header.frame_id = "base_sonar";
-  sonar_point.header.stamp = ros::Time();
-  sonar_point.point.x = sonar_point.point.x / 100;
-  sonar_point.point.y = sonar_point.point.y / 100;
-  sonar_point.point.z = sonar_point.point.z / 100;
+/*
+ * Callback function for /scan topic. Creates a LaserScan message by joining
+ * /scan and /sonar_scan. Published to /merged_scan. The new LaserScan message
+ * can be used to create maps.
+ *
+ * msg: LaserScan message from subscriber
+ */
+void lidar_callback(sensor_msgs::LaserScan msg) {
 
-  try{
-    geometry_msgs::PointStamped base_point;
-    listener.transformPoint("base_link", sonar_point, base_point);
+    // Define the viable range of the sonar (in meters)
+    float sonar_min_range = 0.0;
+    float sonar_max_range = 2.0;
 
-    ROS_INFO("base_sonar: (%.2f, %.2f. %.2f) -----> base_link: (%.2f, %.2f, %.2f) at time %.2f",
-        sonar_point.point.x, sonar_point.point.y, sonar_point.point.z,
-        base_point.point.x, base_point.point.y, base_point.point.z, base_point.header.stamp.toSec());
-  
-    pub->publish(base_point);
-  }
-  catch(tf::TransformException& ex){
-    ROS_ERROR("Received an exception trying to transform a point from \"base_sonar\" to \"base_link\": %s", ex.what());
-  }
+    // If the sonar reading is within the viable range of the sonar
+    if (sonar_min_range <= sonar_scan.range &&
+            sonar_scan.range <= sonar_max_range) {
 
+        // Insert the sonar scan data into the lidar scan
+        // 512 elements in lidar scan, 180 elements in sonar scan
+        int insert_index = 512 - round(sonar_scan.angle / 180.0 * 512.0);
+        msg.ranges[insert_index] = sonar_scan.range;
+    }
+
+    // Publish the new merged LaserScan message
+    merged_pub.publish(msg);
 }
 
-int main(int argc, char** argv){
-  ros::init(argc, argv, "sonar_transform");
-  ros::NodeHandle n;
 
-  ros::Subscriber sub_ang = n.subscribe("sonar_data", 50, getSonar);
+int main(int argc, char** argv) {
 
-  tf::TransformListener listener(ros::Duration(10));
+    // Initialize ros node
+    ros::init(argc, argv, "sonar_transform");
+    ros::NodeHandle n;
 
-  //we'll transform a point once every second
-  ros::Timer timer = n.createTimer(ros::Duration(0.5), boost::bind(&transformPoint, boost::ref(listener)));
+    // Initialize subscribers to sonar and lidar data
+    ros::Subscriber sonar_sub = n.subscribe("sonar_data", 50, sonar_callback);
+    ros::Subscriber lidar_sub = n.subscribe("scan", 50, lidar_callback);
 
-  pub = new ros::Publisher(n.advertise<geometry_msgs::PointStamped>("sonar_transformed", 50));
+    // Initialize publisher for merged scan topic
+    merged_pub = n.advertise<sensor_msgs::LaserScan>("merged_scan", 10);
 
-  ros::spin();
-
+    ros::spin();
 }
+
