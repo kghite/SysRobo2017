@@ -11,20 +11,20 @@ from scipy import misc, special,stats
 from matplotlib import pyplot as plt
 
 
-
 class Feature_Matcher():
-
     def __init__(self):
         """ Initialize the robot control, """
         rospy.init_node('featurematcher')
         self.sleepy = rospy.Rate(2)
-        #subscribe to map for occupancy grid
-        rospy.Subscriber('/map',OccupancyGrid, self.process_occupancy_grid)
-        #save last map
-        self.last_map = None
+        #subscribe to map for occupancy grid, publish to elevator map
+        rospy.Subscriber('/map', OccupancyGrid, self.process_occupancy_grid)
+        self.map_pub = rospy.Publisher('/elevatormap', OccupancyGrid, queue_size = 10)
+        self.last_map = None #save last map
         #path to feature to match in greyscale image form
         self.featurepath = "elevator_template.jpg"
-        self.testpath = "test_image.jpg" #for test
+        self.test_path = "test_image.jpg" #for test
+        self.map_path = "map_image.jpg" #for test
+
         #load feature to compare to
         #self.features = np.load(self.featurepath)
         #image_cv2 = cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
@@ -32,9 +32,7 @@ class Feature_Matcher():
         # load template sign images as grayscale
         self.elevators = cv2.imread(self.featurepath,0)
         #load map template as graysacle(for testing)
-        self.map_image = cv2.imread(self.testpath,0)
-
-        map_pub = rospy.Publisher('/elevatormap',OccupancyGrid, queue_size = 10)
+        # self.map_image = cv2.imread(self.test_path,0)
 
         self.test=False #whether or not to run the test picture printout
 
@@ -44,11 +42,19 @@ class Feature_Matcher():
 
         #map_image = self.last_map
 
-        map_image = self.map_image
+        if self.elevators is None:
+            print 'Elevators are None. NOT MATCHING FEATURES. (Are you in the right subdirectory?)'
+            return
+        if self.last_map is None is None:
+            print 'Elevators are good, last map is None. NOT MATCHING FEATURES'
+            return
+
+        print 'matching features'
+        map_image = cv2.imread(self.map_path,0)
         elevator_image = self.elevators
         res = cv2.matchTemplate(map_image,elevator_image,eval('cv2.TM_CCOEFF'))
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
-        top_left = max_loc
+        top_left = max_loc #top left of where it's recognizing an elevator it's the "max location" coming out of the cv2 function
         confidence = max_val
 
         if self.test==True: #print picture things for debugging!
@@ -65,16 +71,17 @@ class Feature_Matcher():
         #create new blank array
         newgridarr = np.zeros(self.map_width*self.map_height)
         #make corresponding value 100% chance of occupancy
-        newgridarr[max_loc[0]*top_left[1]] = 100
+        newgridarr[top_left[0]*top_left[1]] = 100
         #make occupancy grid.
         newgrid = OccupancyGrid()
-        newgrid.info.widgh = self.map_width
+        newgrid.info.width = self.map_width
         newgrid.info.height = self.map_height
         newgrid.data = newgridarr
 
-        #only publish if confidence is high
-        if confidence > 60:
-            map_pub.publish(newgrid)
+        # print confidence
+        #TODO: CONFIDENCE NUMBERS ARE WEIRD
+        if confidence > 60: #only publish if confidence is high
+            self.map_pub.publish(newgrid)
 
 
 
@@ -90,14 +97,14 @@ class Feature_Matcher():
         np_arr = np.reshape(np_arr,(occupancy_grid.info.width, occupancy_grid.info.height))
         #threshold to 0s and 1s
         binary_np = stats.threshold(stats.threshold(np_arr,0,101,0),0,1,255)
-        self.last_map = binary_np
+        self.last_map = cv2.imwrite(self.map_path,binary_np)
+        print 'RECEIVED'
 
-
-    ##Main
+        self.match_features()
 
     def run(self):
-        self.sleepy.sleep()
-        self.match_features()
+        while not rospy.is_shutdown():
+            self.sleepy.sleep()
 
 feature = Feature_Matcher()
 feature.test=False #set me to true to get printing images for debugging!
