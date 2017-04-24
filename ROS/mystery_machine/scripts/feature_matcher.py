@@ -52,7 +52,9 @@ class Feature_Matcher():
         print 'matching features'
         map_image = cv2.imread(self.map_path,0)
         elevator_image = self.elevators
+
         res = cv2.matchTemplate(map_image,elevator_image,eval('cv2.TM_CCOEFF'))
+
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
         top_left = max_loc #top left of where it's recognizing an elevator it's the "max location" coming out of the cv2 function
         confidence = max_val
