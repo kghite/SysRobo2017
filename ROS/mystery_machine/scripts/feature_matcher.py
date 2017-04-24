@@ -43,13 +43,16 @@ class Feature_Matcher():
 
         map_image = self.mapimage
         elevator_image = self.elevators
+
+        print map_image
+        print elevator_image
         #
-        res =cv2.matchTemplate(map_image,elevator_image,'cv2.TM_CCOEFF')
+        res =cv2.matchTemplate(map_image,elevator_image,eval('cv2.TM_CCOEFF'))
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
         top_left = max_loc
         confidence = max_val
         #create new blank array
-        newgridarr = np.zeroes(self.map_width*self.map_height)
+        newgridarr = np.zeros(self.map_width*self.map_height)
         #make corresponding value 100% chance of occupancy
         newgridarr[max_loc[0]*top_left[1]] = 100
         #make occupancy grid.
