@@ -14,10 +14,6 @@
 #define USB_CON
 #define PI 3.14159265358979323846
 
-// Global constants
-const float pi = 3.14159;
-const char *GLOBAL_FRAME = "1";
-
 // Setup for all the neoPixels
 const byte LEFT_STRIP  = 3;
 const byte RIGHT_STRIP = 2;
@@ -38,6 +34,8 @@ uint32_t purple= left_strip.Color(255,0,255,0);
 
 // Variables for blink timing
 unsigned long current_time;
+unsigned long time_of_last_loop;
+const int loop_time_interval = 10;
 unsigned long blink_time;
 byte blinked = 0;
 int delay_period = 500; // Blinking speed for alive light
@@ -93,6 +91,9 @@ const int MIN_ENCODER_VAL = -32768;
 
 // Set up ROS node handling and feedback channel
 ros::NodeHandle nh;
+//ros::NodeHandle_<HardwareType, MAX_PUBLISHERS=25, MAX_SUBSCRIBERS=25, IN_BUFFER_SIZE=512,
+//    OUT_BUFFER_SIZE=512> nh;
+//ros::NodeHandle_<ArduinoHardware, 25, 25, 2048, 2048> nh;
 
 
 // Set up publishers
@@ -138,10 +139,10 @@ void twistCb( const geometry_msgs::Twist& twist_input ) {
   // update_drive_motors();
   
   // Print the received Twist message
-  debug_info = "Received Twist message!\n";
-  debug_info += "Linear vel: " + String(linear_vel) + "\n";
-  debug_info += "Angular vel: " + String(angular_vel);
-  debug_print(debug_info);
+//  debug_info = "Received Twist message!\n";
+//  debug_info += "Linear vel: " + String(linear_vel) + "\n";
+//  debug_info += "Angular vel: " + String(angular_vel);
+//  debug_print(debug_info);
 }
 
 ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("cmd_vel", &twistCb );
@@ -179,7 +180,8 @@ void setup() {
   
   // Initialize timing things
   current_time = millis();
-  blink_time   = millis();
+  time_of_last_loop = current_time;
+  blink_time   = current_time;
   
   // Setup all the NeoPixels
   left_strip.begin();
@@ -234,40 +236,45 @@ void setup() {
 
 // Run hindbrain loop until commanded to stop LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL
 void loop() {
-
-  update_pan_and_read_sonar();
   
-  // Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
-  if (digitalRead(ESTOP_PIN)) {
-    delay_period = 500;
+  current_time = millis();
+  
+  if (current_time - time_of_last_loop >= loop_time_interval) {
+    // Run ros callbacks
+    nh.spinOnce();
+  
+    //update_pan_and_read_sonar(); // this messes with the callbacks
+    
+    // Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
+    if (digitalRead(ESTOP_PIN)) { // the digitalRead messes with the callbacks
+      delay_period = 500;
+    }
+    else {
+      delay_period = 150;
+    }
+    
+    check_ir_sensors(); // doesn't seem to mess with callbacks
+    
+    // Act: Run actuators and behavior lights
+    blink(); // doesn't seem to mess with callbacks
+    
+    // Write to drive motors with current commands
+    update_drive_motors(); // doesn't seem to mess with callbacks
+    
+    // Check if new encoder values have been read - if so, publish them
+    if (left_encoder_updated) { // doesn't seem to mess with callbacks
+      left_encoder_msg.data = left_encoder_pos;
+      left_encoder_publisher.publish(&left_encoder_msg);
+      left_encoder_updated = false;
+    }
+    if (right_encoder_updated) { // doesn't seem to mess with callbacks
+      right_encoder_msg.data = right_encoder_pos;
+      right_encoder_publisher.publish(&right_encoder_msg);
+      right_encoder_updated = false;
+    }
+  
+    time_of_last_loop = current_time;
   }
-  else {
-    delay_period = 150;
-  }
-  
-  check_ir_sensors();
-  
-  // Act: Run actuators and behavior lights
-  blink();
-  
-  // Write to drive motors with current commands
-  update_drive_motors();
-  
-  // Check if new encoder values have been read - if so, publish them
-  if (left_encoder_updated) {
-    left_encoder_msg.data = left_encoder_pos;
-    left_encoder_publisher.publish(&left_encoder_msg);
-    left_encoder_updated = false;
-  }
-  if (right_encoder_updated) {
-    right_encoder_msg.data = right_encoder_pos;
-    right_encoder_publisher.publish(&right_encoder_msg);
-    right_encoder_updated = false;
-  }
-  
-  // Spin!
-  nh.spinOnce();
-  delay(1);
 }
 
 
@@ -278,7 +285,7 @@ void debug_print(String message) {
   char charBuf[100];
   message.toCharArray(charBuf,100);    
   debug_msg.data = charBuf;
-  debug_publisher.publish(&debug_msg);
+  //debug_publisher.publish(&debug_msg);
 }
 
 
@@ -366,12 +373,11 @@ void update_drive_motors() {
   }
   
   // Print the state
-  debug_info = "Updating drive motors!\n";
-  debug_info += "Linear vel goal: " + String(linear_vel) + "\n";
-  debug_info += "Linear vel: " + String(current_linear_vel) + "\n";
-  debug_info += "Angular vel goal: " + String(angular_vel) + "\n";
-  debug_info += "Angular vel: " + String(current_angular_vel);
-  
+  debug_info = "Updating drive motors!";
+//  debug_info += "Linear vel goal: " + String(linear_vel) + "\n";
+//  debug_info += "Linear vel: " + String(current_linear_vel) + "\n";
+//  debug_info += "Angular vel goal: " + String(angular_vel) + "\n";
+//  debug_info += "Angular vel: " + String(current_angular_vel);
   debug_print(debug_info);
 }
 
@@ -399,11 +405,11 @@ void update_pan_and_read_sonar() {
     time_of_last_sonar_pan = millis();
   }
   // Running average of a few sonar readings
-  for (int i=0; i<SONAR_RUN_AVG_LEN; i++) {
-    sonar_reading += analogRead(SONAR_PIN)/100.0;
-    delay(1);
-  }
-  sonar_reading /= float(SONAR_RUN_AVG_LEN); // divide total by number of readings
+//  for (int i=0; i<SONAR_RUN_AVG_LEN; i++) {
+//    sonar_reading += analogRead(SONAR_PIN)/100.0;
+//  }
+//  sonar_reading /= float(SONAR_RUN_AVG_LEN); // divide total by number of readings
+  sonar_reading = analogRead(SONAR_PIN)/100.0;
   sonar_point_id ++;
   sonar_data_msg.header.seq = sonar_point_id;
   sonar_data_msg.header.stamp.sec = millis()/1000;
@@ -414,6 +420,10 @@ void update_pan_and_read_sonar() {
   sonar_data_msg.range = sonar_reading;
   sonar_data_msg.angle = sonar_pan_angle; // angle in degrees where 0 is right and 180 is left
   sonar_data_publisher.publish(&sonar_data_msg);
+  
+  // Print the state
+  debug_info = "Updating sonar!";
+  debug_print(debug_info);
 }
 
 
@@ -448,6 +458,10 @@ void check_ir_sensors() {
       ir_estop_publisher.publish(&ir_estop_msg);
     }
   }
+  
+  // Print the state
+//  debug_info = "Checking IR sensors!";
+//  debug_print(debug_info);
 }
 
 
@@ -489,6 +503,10 @@ void blink() {
     
     blink_time = millis();
   }
+    
+  // Print the state
+//  debug_info = "Blinking lights!";
+//  debug_print(debug_info);
 }
 
 
