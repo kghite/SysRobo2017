@@ -312,10 +312,12 @@ void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
     // set incoming data to object's scan_new attr
     FSM::scan_new = scan.ranges;
 
-    // TODO: restrict indices such that we are only looking at elev doors, not the entire scan.ranges
+    // TODO: 
+    // First, determine if 0-256 is actually left.  Or is it right?
+    // Second, make comparison more robust, i.e. not just a straight comparison between old and new (because tolerance in readings allows for slop)
     std::vector<float> scan_new_left( 
         FSM::scan_new.begin()+0,
-        FSM::scan_new.begin()+256);
+        FSM::scan_new.begin(1)+256);
 
     std::vector<float> scan_new_right( 
         FSM::scan_new.begin()+256,
