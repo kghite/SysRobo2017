@@ -72,9 +72,16 @@ class FSM {
         float elev_vel;   // velocity parameter
 
         // declaring scanResponse info
-        bool scan_changes;   // 0 = no change; 1 = changed
+        bool scan_changes_left; // 0 = no changes from old; 
+                                // 1 = there are changes from old
+        bool scan_changes_right;
+
         std::vector<float> scan_old;
+        std::vector<float> scan_old_left;
+        std::vector<float> scan_old_right;
         std::vector<float> scan_new;
+        std::vector<float> scan_new_left;
+        std::vector<float> scan_new_right;
 
         // declaring odomResponse info
         float dist_traveled;
@@ -305,15 +312,28 @@ void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
     // set incoming data to object's scan_new attr
     FSM::scan_new = scan.ranges;
 
+    // TODO: restrict indices such that we are only looking at elev doors, not the entire scan.ranges
+    std::vector<float> scan_new_left( 
+        FSM::scan_new.begin()+0,
+        FSM::scan_new.begin()+256);
+
+    std::vector<float> scan_new_right( 
+        FSM::scan_new.begin()+256,
+        FSM::scan_new.begin()+512);
+
+
     // compare to scan_old, setting bool scan_changes appropriately
-    if (FSM::scan_new == FSM::scan_old) {
-        FSM::scan_changes = 1;
-    } else {
-        FSM::scan_changes = 0;
-    }
+    // If there are no changes, bool = 0.  If changes, bool = 1.
+    if (scan_new_left == FSM::scan_old_left) FSM::scan_changes_left = 0;
+    else FSM::scan_changes_left = 1;
+
+    if (scan_new_right == FSM::scan_old_right) FSM::scan_changes_right = 0;
+    else FSM::scan_changes_right = 1;
 
     // set scan_new to scan_old
     FSM::scan_old = FSM::scan_new;
+    FSM::scan_old_left = scan_new_left;
+    FSM::scan_old_right = scan_old_right;
 }
 
 void FSM::odomResponse(const nav_msgs::Odometry odom) {
