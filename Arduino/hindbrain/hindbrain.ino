@@ -401,9 +401,6 @@ void check_ir_sensors() {
 }
 
 
-
-
-
 // Helper function for attaching an interrupt to a pin
 int digital_pin_to_interrupt(int pin) {
   
