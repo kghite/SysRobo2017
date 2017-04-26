@@ -7,6 +7,7 @@
  * exploration with the Mystery Machine  
 */
 
+
 #include "string"
 #include "list"
 #include "iostream"
@@ -22,6 +23,7 @@
 #include "std_msgs/Int8.h"
 #include "std_msgs/Int16.h"
 #include "tf/transform_datatypes.h"
+
 
 // Set up state values
 enum State {
@@ -85,13 +87,12 @@ class FSM {
         sensor_msgs::LaserScan scan;
         std_msgs::Int8 floor;
 
-
         // declaring methods
         float explore_floor();
         geometry_msgs::Pose find_elevator(nav_msgs::OccupancyGrid search_map);
         bool nav_to_elevator(geometry_msgs::Pose elevator_pose);
         FloorSet order_maps(std::string map_store_file, 
-                                std_msgs::Int8 direction);
+                std_msgs::Int8 direction);
         FloorSet elevator_interaction();
         void call_elevator();
         void enter_elevator();
@@ -104,6 +105,7 @@ class FSM {
         void odomResponse(nav_msgs::Odometry odom);
 };
 
+
 /*
 * This is equivalnt to the init() method in python.
 */
@@ -111,6 +113,7 @@ FSM::FSM(ros::NodeHandle n) {
     elev_vel = 0.1;    // TODO: confirm this vel for elevator specifically
     scan_changes = 0;
 }
+
 
 /* 
  * Runs gmapping to explore an unmapped floor to some percentage complete
@@ -121,6 +124,7 @@ FSM::FSM(ros::NodeHandle n) {
 float FSM::explore_floor() {
     // Gmapping integration
 }
+
 
 /* 
  * Finds an elevator in a given occupancy grid using an assumed shape
@@ -134,6 +138,7 @@ geometry_msgs::Pose FSM::find_elevator(nav_msgs::OccupancyGrid search_map) {
     // Find an elevator within a map
 }
 
+
 /* 
  * Navigate to an elevator given the given elevator pose
  *
@@ -145,6 +150,7 @@ bool FSM::nav_to_elevator(geometry_msgs::Pose elevator_pose) {
     // Go to an elevator loading position
     // Note that wpt must be positioned such that scan can detect both elevators
 }
+
 
 /* 
  * Determines the probabilities of floor orders for the current map set
@@ -159,12 +165,12 @@ FloorSet FSM::order_maps(std::string map_store_file,
     // Determine all possible map orders and return with a given likelihood
 }
 
+
 /* 
  * Provide HRI around calling elevator: Robot plays soundtrack while gently
  * rocking back and forth.
  */
 void FSM::call_elevator() {
-
 
     // Publish state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
@@ -189,6 +195,7 @@ void FSM::call_elevator() {
     }
 }
 
+
 /* 
  * Provide HRI around entering elevator.
  */
@@ -210,7 +217,8 @@ void FSM::enter_elevator() {
     cmd_vel.linear.y = FSM::elev_vel;
     cmd_vel_pub.publish(cmd_vel);
 
-    // Once 1m from elevator’s back wall: stop and rotate 180 to face elevator doors
+    // Once 1m from elevator’s back wall: stop and rotate 180 to face
+    // elevator doors
     if (scan.ranges[256] < 1) {
         // stop moving forward when we are < 1m from elevator's back wall
         cmd_vel.linear.y = 0;
@@ -232,6 +240,7 @@ void FSM::enter_elevator() {
     }
 }
 
+
 /* 
  * Provide HRI around riding elevator.
  */
@@ -245,6 +254,7 @@ void FSM::ride_elevator() {
         FSM::state = exiting_elevator;
     }
 }
+
 
  /*
  * Provide HRI around exiting elevator.
@@ -277,7 +287,6 @@ FloorSet FSM::exit_elevator() {
     // if (FSM::scan_changes == 0) {
     //     FSM::state = ride_elevator();
     // }
-
 }
 
 
@@ -290,6 +299,7 @@ FloorSet FSM::exit_elevator() {
 Floor FSM::match_map() {
 
 }
+
 
 void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
 
@@ -306,6 +316,7 @@ void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
     // set scan_new to scan_old
     FSM::scan_old = FSM::scan_new;
 }
+
 
 void FSM::odomResponse(const nav_msgs::Odometry odom) {
 
@@ -346,6 +357,7 @@ void FSM::odomResponse(const nav_msgs::Odometry odom) {
 
 
 int main(int argc, char **argv) {
+
     ros::init(argc, argv, "mission_control");
     ros::NodeHandle n;
     ros::Rate loop_rate(10);
@@ -357,22 +369,19 @@ int main(int argc, char **argv) {
     mission_controller.state = calling_elevator;
     mission_controller.floor.data = 1;
 
-
     // declaring & initializing publishers
     state_pub = n.advertise<std_msgs::Int8>("/bot_state", 1000);
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 500);
-
-
-
 
     // Continuously check the state and run the appropriate class methods
     // States get changed in the methods only
     // Do all this in a callback so will pause if the e-stop is pressed
 
     // TODO: confirm rate for the following subscribers
-    ros::Subscriber sub_scan = n.subscribe("/scan", 200, &FSM::scanResponse, &mission_controller);
-    ros::Subscriber sub_odom = n.subscribe("/odom", 200, &FSM::odomResponse, &mission_controller);
-
+    ros::Subscriber sub_scan = n.subscribe("/scan", 200, &FSM::scanResponse,
+            &mission_controller);
+    ros::Subscriber sub_odom = n.subscribe("/odom", 200, &FSM::odomResponse,
+            &mission_controller);
 
     while (ros::ok()) {
 
@@ -427,9 +436,6 @@ int main(int argc, char **argv) {
         ros::spinOnce();
         loop_rate.sleep();
     }
-
-
-    // ros::spin();
 
     return 0;
 }
