@@ -80,16 +80,14 @@ class Feature_Matcher():
         newgrid.info.height = self.map_height
         newgrid.data = newgridarr
 
-        # print confidence
-        #TODO: CONFIDENCE NUMBERS ARE WEIRD
+        #TODO: CONFIDENCE NUMBERS ARE WEIRD. Either scale them or adjust this threshhold
         if confidence > 60: #only publish if confidence is high
             self.map_pub.publish(newgrid)
 
 
-
     def process_occupancy_grid(self, occupancy_grid):
         '''
-        Input: Occuapancy grid
+        Input: Occupancy grid
         Output: Binary openCV image of occupancy grid
         '''
         #read into numpy array and shape correctly
@@ -101,11 +99,13 @@ class Feature_Matcher():
         binary_np = stats.threshold(stats.threshold(np_arr,0,101,0),0,1,255)
         self.last_map = cv2.imwrite(self.map_path,binary_np)
         print 'RECEIVED'
-
+        #initiate feature matching. Whenever you receive a map, find elevators!
         self.match_features()
 
     def run(self):
         while not rospy.is_shutdown():
+            #although it doesn't look like anything is running, trust us.
+            #Feature matching is initiated by receiving a map from the /map rostopic.
             self.sleepy.sleep()
 
 feature = Feature_Matcher()
