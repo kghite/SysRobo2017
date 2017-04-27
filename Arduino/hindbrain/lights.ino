@@ -1,4 +1,3 @@
-
 // Setup for all the neoPixels
 const byte LEFT_STRIP  = 3;
 const byte RIGHT_STRIP = 2;
@@ -22,7 +21,7 @@ byte blinked = 0;
 int delay_period = 500; // Blinking speed for alive light
 
 
-// Initialize lights
+// Setup process for lights
 void setup_lights() {
   
   // Setup all the NeoPixels
@@ -104,19 +103,19 @@ void change_all_colors(uint32_t color) {
 }
 
 
-// Helper functions for right and left banks of lights
+// Set all left lights to a specified color and turn off all right lights
 void change_left_colors(uint32_t color) {
   
-  for (int i = 0; i < 8; i++)
-  {
+  for (int i = 0; i < 8; i++) {
     left_strip.setPixelColor(i,color);
     right_strip.setPixelColor(i,off);
   }
-  for (int i = 0; i < 12; i++)
-  {
+  
+  for (int i = 0; i < 12; i++) {
     left_ring.setPixelColor(i,color);
     right_ring.setPixelColor(i,off);
   }
+  
   left_strip.show();
   right_strip.show();
   left_ring.show();
@@ -124,6 +123,7 @@ void change_left_colors(uint32_t color) {
 }
 
 
+// Set all right lights to a specified color and turn off all left lights
 void change_right_colors(uint32_t color) {
   
   for (int i = 0; i < 8; i++)
