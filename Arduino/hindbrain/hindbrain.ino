@@ -33,10 +33,10 @@ int current_angular_vel = 0;
 const byte SONAR_PIN = A7;
 const byte SONAR_PAN_PIN = 45;
 Adafruit_TiCoServo sonar_pan_servo;
-int sonar_pan_angle = 90;
+uint8_t sonar_pan_angle = 90;
 unsigned long time_of_last_sonar_pan = millis();
-int sonar_pan_time_interval = 15;
-int sonar_pan_angle_increment = 1;
+uint8_t sonar_pan_time_interval = 15;
+uint8_t sonar_pan_angle_increment = 1;
 float sonar_reading;
 int sonar_point_id = 0;
 
@@ -47,43 +47,35 @@ const byte ESTOP_PIN = 42;
 const byte IR_PIN_1 = A0;
 const byte IR_PIN_2 = A1;
 const int ir_low_threshold  = 300;
-int ir_estop = 0;
+uint8_t ir_estop = 0;
 
 // Motor encoder globals
-int left_encoder_pin_A = 18;
-int left_encoder_pin_B = 19;
+const uint8_t LEFT_ENCODER_PIN_A = 18;
+const uint8_t LEFT_ENCODER_PIN_B = 19;
 long left_encoder_pos = 0;
 boolean left_encoder_updated = false;
-int right_encoder_pin_A = 20;
-int right_encoder_pin_B = 21;
+const uint8_t RIGHT_ENCODER_PIN_A = 20;
+const uint8_t RIGHT_ENCODER_PIN_B = 21;
 long right_encoder_pos = 0;
 boolean right_encoder_updated = false;
 const int MAX_ENCODER_VAL = 32767;
 const int MIN_ENCODER_VAL = -32768;
 
 // Define LIDAR tilt servo
-const byte LIDAR_TILT_PIN = 8;
+const uint8_t LIDAR_TILT_PIN = 8;
 Adafruit_TiCoServo lidar_tilt_servo;
-const int middle_tilt_position = 110;
+const uint8_t middle_tilt_position = 110;
 int current_tilt_position = middle_tilt_position;
 
 // Sending audio state through digital pins
-const int AUDIO_STATE_WRITE_PIN_1 = 5; // TODO: define all these pins to real digital pins
-const int AUDIO_STATE_WRITE_PIN_2 = 6;
-const int AUDIO_STATE_WRITE_PIN_4 = 7;
+const uint8_t AUDIO_STATE_WRITE_PIN_1 = 5; // TODO: define all these pins to real digital pins
+const uint8_t AUDIO_STATE_WRITE_PIN_2 = 6;
+const uint8_t AUDIO_STATE_WRITE_PIN_4 = 7;
 uint8_t audio_state_write_1 = 0;
 uint8_t audio_state_write_2 = 0;
 uint8_t audio_state_write_4 = 0;
 uint8_t curr_audio_state = 0;
 uint8_t prev_audio_state = 0;
-
-
-// Define pins for commanding second arduino to play Audio
-const int AUDIO_STATE_WRITE_PIN = A3;
-const int NUM_AUDIO_STATES = 5;
-const int AUDIO_STATE_MAX_VOLTAGE = 1023;
-int prev_audio_state = 0;
-int curr_audio_state = 0;
 
 
 // Set up ROS node handling and feedback channel
@@ -176,16 +168,16 @@ void setup() {
   pinMode(SONAR_PAN_PIN, INPUT);
   
   // Setup encoders and encoder interrupts
-  pinMode(left_encoder_pin_A, INPUT);
-  digitalWrite(left_encoder_pin_A, HIGH);
-  pinMode(left_encoder_pin_B, INPUT);
-  digitalWrite(left_encoder_pin_B, HIGH);
-  attachInterrupt(digital_pin_to_interrupt(left_encoder_pin_A), update_left_encoder, CHANGE);
-  pinMode(right_encoder_pin_A, INPUT);
-  digitalWrite(right_encoder_pin_A, HIGH);
-  pinMode(right_encoder_pin_B, INPUT);
-  digitalWrite(right_encoder_pin_B, HIGH);
-  attachInterrupt(digital_pin_to_interrupt(right_encoder_pin_A), update_right_encoder, CHANGE);
+  pinMode(LEFT_ENCODER_PIN_A, INPUT);
+  digitalWrite(LEFT_ENCODER_PIN_A, HIGH);
+  pinMode(LEFT_ENCODER_PIN_B, INPUT);
+  digitalWrite(LEFT_ENCODER_PIN_B, HIGH);
+  attachInterrupt(digital_pin_to_interrupt(LEFT_ENCODER_PIN_A), update_left_encoder, CHANGE);
+  pinMode(RIGHT_ENCODER_PIN_A, INPUT);
+  digitalWrite(RIGHT_ENCODER_PIN_A, HIGH);
+  pinMode(RIGHT_ENCODER_PIN_B, INPUT);
+  digitalWrite(RIGHT_ENCODER_PIN_B, HIGH);
+  attachInterrupt(digital_pin_to_interrupt(RIGHT_ENCODER_PIN_A), update_right_encoder, CHANGE);
   
   // Attach Servo objects to correct pins
   forward_channel.attach(FORWARD_PIN);
@@ -239,8 +231,44 @@ void debug_print(String message) {
 // Set output voltage on AUDIO_STATE_WRITE_PIN pin to the correct value to tell the other arduino
 // which audio file it should play.
 void set_audio_state() {
+  
+  // If this is a new audio state
   if (curr_audio_state != prev_audio_state) {
-    analogWrite(AUDIO_STATE_WRITE_PIN, curr_audio_state * AUDIO_STATE_MAX_VOLTAGE / NUM_AUDIO_STATES);
+    
+    // Decompose curr_audio_state into a 3 bit binary number
+    uint8_t decomposed_audio_state = curr_audio_state;
+    
+    // 0X00
+    if (decomposed_audio_state >= 4) {
+      decomposed_audio_state %= 4;
+      audio_state_write_4 = 1;
+    }
+    else {
+      audio_state_write_4 = 0;
+    }
+    
+    // 00X0
+    if (decomposed_audio_state >= 2) {
+      decomposed_audio_state %= 2;
+      audio_state_write_2 = 1;
+    }
+    else {
+      audio_state_write_2 = 0;
+    }
+    
+    // 000X
+    if (decomposed_audio_write_1 >= 1) {
+      decomposed_audio_state %= 1;
+      audio_state_write_1 = 1;
+    }
+    else {
+      audio_state_write_1 = 0;
+    }
+    
+    // Write audio state as 3 bit binary number where each bit is a digital pin
+    digitalWrite(AUDIO_STATE_WRITE_PIN_4, audio_state_write_4); // 0X00
+    digitalWrite(AUDIO_STATE_WRITE_PIN_2, audio_state_write_2); // 00X0
+    digitalWrite(AUDIO_STATE_WRITE_PIN_1, audio_state_write_1); // 000X
   }
 }
 
@@ -277,8 +305,8 @@ void check_right_encoder() {
 
 void update_left_encoder() {
   
-  int channel_A = digitalRead(left_encoder_pin_A);
-  int channel_B = digitalRead(left_encoder_pin_B);
+  int channel_A = digitalRead(LEFT_ENCODER_PIN_A);
+  int channel_B = digitalRead(LEFT_ENCODER_PIN_B);
   if (channel_A == channel_B) {
     // Decrement encoder value unless it is at min, in which case it should wrap
     if (left_encoder_pos <= MIN_ENCODER_VAL) {
@@ -304,8 +332,8 @@ void update_left_encoder() {
 
 void update_right_encoder() {
   
-  int channel_A = digitalRead(right_encoder_pin_A);
-  int channel_B = digitalRead(right_encoder_pin_B);
+  int channel_A = digitalRead(RIGHT_ENCODER_PIN_A);
+  int channel_B = digitalRead(RIGHT_ENCODER_PIN_B);
   if (channel_A == channel_B) {
     // Increment encoder value unless it is at max, in which case it should wrap
     if (right_encoder_pos >= MAX_ENCODER_VAL) {
