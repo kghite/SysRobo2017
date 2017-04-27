@@ -4,6 +4,7 @@
 #include <geometry_msgs/Point.h>
 #include <sensor_msgs/LaserScan.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Int8.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32MultiArray.h>
@@ -14,54 +15,24 @@
 #define USB_CON
 #define PI 3.14159265358979323846
 
-// Global constants
-const float pi = 3.14159;
-const char *GLOBAL_FRAME = "1";
 
-// Setup for all the neoPixels
-const byte LEFT_STRIP  = 3;
-const byte RIGHT_STRIP = 2;
-const byte LEFT_RING   = 5;
-const byte RIGHT_RING  = 4;
-
-Adafruit_NeoPixel left_strip = Adafruit_NeoPixel(8, LEFT_STRIP,NEO_GRBW + NEO_KHZ800);
-Adafruit_NeoPixel right_strip = Adafruit_NeoPixel(8, RIGHT_STRIP,NEO_GRBW + NEO_KHZ800);
-Adafruit_NeoPixel left_ring = Adafruit_NeoPixel(12, LEFT_RING,NEO_GRBW + NEO_KHZ800);
-Adafruit_NeoPixel right_ring = Adafruit_NeoPixel(12, RIGHT_RING,NEO_GRBW + NEO_KHZ800);
-
-uint32_t white = left_strip.Color(0,0,0,255);
-uint32_t yellow= left_strip.Color(255,128,0);
-uint32_t red   = left_strip.Color(255,0,0,0);
-uint32_t off   = left_strip.Color(0,0,0,0);
-uint32_t blue  = left_strip.Color(0,64,255,0);
-uint32_t purple= left_strip.Color(255,0,255,0);
-
-// Variables for blink timing
+// Timing variable
 unsigned long current_time;
-unsigned long blink_time;
-byte blinked = 0;
-int delay_period = 500; // Blinking speed for alive light
 
 // Pins and servo objects for Roboclaw control
 const byte FORWARD_PIN = 6;
 const byte TURN_PIN = 7;
-
 Adafruit_TiCoServo forward_channel;
 Adafruit_TiCoServo turn_channel;
-
 int linear_vel =  0;
 int angular_vel = 0;
 int current_linear_vel = 0;
 int current_angular_vel = 0;
 
-// Pins and servo objects for sonar sensor
+// Variables for panning sonar servo and sonar sensor
 const byte SONAR_PIN = A7;
 const byte SONAR_PAN_PIN = 45;
-const int SONAR_RUN_AVG_LEN = 10;
-
 Adafruit_TiCoServo sonar_pan_servo;
-
-// Variables for panning sonar servo
 int sonar_pan_angle = 90;
 unsigned long time_of_last_sonar_pan = millis();
 int sonar_pan_time_interval = 15;
@@ -90,12 +61,26 @@ boolean right_encoder_updated = false;
 const int MAX_ENCODER_VAL = 32767;
 const int MIN_ENCODER_VAL = -32768;
 
+// Define LIDAR tilt servo
+const byte LIDAR_TILT_PIN = 8;
+Adafruit_TiCoServo lidar_tilt_servo;
+const int middle_tilt_position = 110;
+int current_tilt_position = middle_tilt_position;
+
+
+// Define pins for commanding second arduino to play Audio
+const int AUDIO_STATE_WRITE_PIN = A3;
+const int NUM_AUDIO_STATES = 5;
+const int AUDIO_STATE_MAX_VOLTAGE = 1023;
+int prev_audio_state = 0;
+int curr_audio_state = 0;
+
 
 // Set up ROS node handling and feedback channel
 ros::NodeHandle nh;
 
 
-// Set up publishers
+// Set up ROS publishers
 std_msgs::String debug_msg;
 ros::Publisher debug_publisher("debug", &debug_msg);
 
@@ -112,66 +97,60 @@ std_msgs::Int16 right_encoder_msg;
 ros::Publisher right_encoder_publisher("rwheel", &right_encoder_msg);
 
 
-// Various variables for ROS workings
-int odroid_estop = 0;
-String debug_info;
-
-
-// Define LIDAR tilt servo
-const byte LIDAR_TILT_PIN = 8;
-Adafruit_TiCoServo lidar_tilt_servo;
-const int middle_tilt_position = 110;
-int current_tilt_position = middle_tilt_position;
-
-
-// Callback function for a Twist message TCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCbTCb
-void twistCb( const geometry_msgs::Twist& twist_input ) {
+// Callback function for a Twist message
+void cmd_vel_callback( const geometry_msgs::Twist& cmd_vel ) {
   
   // Extract velocity data
   // Multiply by 90 to maintain resolution
   // Ends up giving a signal for write between 0-180
   // Make sure cmd_vel has values that range -1 to 1
-  linear_vel  = int(90 * twist_input.linear.x);
-  angular_vel = int(90 * twist_input.angular.z);
-  
-  // Set motor speeds based on new command
-  // update_drive_motors();
+  linear_vel  = int(90 * cmd_vel.linear.x);
+  angular_vel = int(90 * cmd_vel.angular.z);
   
   // Print the received Twist message
-  debug_info = "Received Twist message!\n";
-  debug_info += "Linear vel: " + String(linear_vel) + "\n";
-  debug_info += "Angular vel: " + String(angular_vel);
-  debug_print(debug_info);
+//  debug_info = "Received Twist message!\n";
+//  debug_info += "Linear vel: " + String(linear_vel) + "\n";
+//  debug_info += "Angular vel: " + String(angular_vel);
+//  debug_print(debug_info);
 }
+ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("cmd_vel", &cmd_vel_callback );
 
-ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("cmd_vel", &twistCb );
 
-
-// Callback function for an IR Estop message IRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCbIRCb
-void irEstopCallback( const std_msgs::Int16& int_input ) {
+// Callback function for an IR Estop message
+void ir_estop_callback(const std_msgs::Int16& msg) {
   
   // Check and see if the midbrain says it's okay to move
-  int estop_message = int_input.data;
+  int estop_message = msg.data;
   
   if (estop_message == 2){
     ir_estop = 2;
   }
   
 }
+ros::Subscriber<std_msgs::Int16> ir_estop_sub("ir_estop",&ir_estop_callback);
 
-ros::Subscriber<std_msgs::Int16>ir_estop_sub("ir_estop",&irEstopCallback);
 
-
-// Callback function for an Odroid Estop message OCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcbOCbOcbOcb
-void odroidEstopCallback( const std_msgs::Int16& int_input ) {
+// Callback function for an Odroid Estop message
+int odroid_estop = 0;
+void odroid_estop_callback(const std_msgs::Int16& msg) {
   
   // Just update this estop.. Pretty easy
-  int estop_message = int_input.data;
+  int estop_message = msg.data;
   
   odroid_estop = estop_message;
 }
+ros::Subscriber<std_msgs::Int16> odroid_estop_sub("odroid_estop",&odroid_estop_callback);
 
-ros::Subscriber<std_msgs::Int16>odroid_estop_sub("odroid_estop",&odroidEstopCallback);
+
+// Callback function for a audio_cmd message
+void audio_cmd_callback(const std_msgs::Int8& msg) {
+  
+  prev_audio_state = curr_audio_state;
+  curr_audio_state  = msg.data;
+  
+  set_audio_state();
+}
+ros::Subscriber<std_msgs::Int8> audio_cmd_sub("audio_cmd", &audio_cmd_callback);
 
 
 // SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
@@ -179,23 +158,8 @@ void setup() {
   
   // Initialize timing things
   current_time = millis();
-  blink_time   = millis();
   
-  // Setup all the NeoPixels
-  left_strip.begin();
-  right_strip.begin();
-  left_ring.begin();
-  right_ring.begin();
-  
-  left_strip.show();
-  right_strip.show();
-  left_ring.show();
-  right_ring.show();
-  
-  left_strip.setBrightness(16);
-  right_strip.setBrightness(16);
-  left_ring.setBrightness(16);
-  right_ring.setBrightness(16);
+  setup_lights();
   
   // Define pin modes
   pinMode(ESTOP_PIN, INPUT);
@@ -234,44 +198,24 @@ void setup() {
 
 // Run hindbrain loop until commanded to stop LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL
 void loop() {
-
-  update_pan_and_read_sonar();
   
-  // Think: Run low level cognition and safety code TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT
-  if (digitalRead(ESTOP_PIN)) {
-    delay_period = 500;
-  }
-  else {
-    delay_period = 150;
-  }
-  
+  // Run loop functions
   check_ir_sensors();
-  
-  // Act: Run actuators and behavior lights
-  blink();
-  
-  // Write to drive motors with current commands
   update_drive_motors();
+  update_pan_and_read_sonar();
+  blink_lights();
+  check_encoders();
   
-  // Check if new encoder values have been read - if so, publish them
-  if (left_encoder_updated) {
-    left_encoder_msg.data = left_encoder_pos;
-    left_encoder_publisher.publish(&left_encoder_msg);
-    left_encoder_updated = false;
-  }
-  if (right_encoder_updated) {
-    right_encoder_msg.data = right_encoder_pos;
-    right_encoder_publisher.publish(&right_encoder_msg);
-    right_encoder_updated = false;
-  }
-  
-  // Spin!
+  // Run ros callbacks
   nh.spinOnce();
+  
+  // Sleep briefly to not rail processing
   delay(1);
 }
 
 
 // Hindbrain Helper Functions******************************************************************************
+
 // Writes a String message to the /debug topic
 void debug_print(String message) {
   
@@ -279,6 +223,45 @@ void debug_print(String message) {
   message.toCharArray(charBuf,100);    
   debug_msg.data = charBuf;
   debug_publisher.publish(&debug_msg);
+}
+
+
+// Set output voltage on AUDIO_STATE_WRITE_PIN pin to the correct value to tell the other arduino
+// which audio file it should play.
+void set_audio_state() {
+  if (curr_audio_state != prev_audio_state) {
+    analogWrite(AUDIO_STATE_WRITE_PIN, curr_audio_state * AUDIO_STATE_MAX_VOLTAGE / NUM_AUDIO_STATES);
+  }
+}
+
+
+// Check if new encoder values have been read - if so, publish them
+void check_encoders() {
+  
+  check_left_encoder();
+  check_right_encoder();
+}
+
+
+// Check if new left_encoder values have been read - if so, publish them
+void check_left_encoder() {
+  
+  if (left_encoder_updated) {
+    left_encoder_msg.data = left_encoder_pos;
+    left_encoder_publisher.publish(&left_encoder_msg);
+    left_encoder_updated = false;
+  }
+}
+
+
+// Check if new right_encoder values have been read - if so, publish them
+void check_right_encoder() {
+  
+  if (right_encoder_updated) {
+    right_encoder_msg.data = right_encoder_pos;
+    right_encoder_publisher.publish(&right_encoder_msg);
+    right_encoder_updated = false;
+  }
 }
 
 
@@ -366,13 +349,12 @@ void update_drive_motors() {
   }
   
   // Print the state
-  debug_info = "Updating drive motors!\n";
-  debug_info += "Linear vel goal: " + String(linear_vel) + "\n";
-  debug_info += "Linear vel: " + String(current_linear_vel) + "\n";
-  debug_info += "Angular vel goal: " + String(angular_vel) + "\n";
-  debug_info += "Angular vel: " + String(current_angular_vel);
-  
-  debug_print(debug_info);
+//  debug_info = "Updating drive motors!";
+//  debug_info += "Linear vel goal: " + String(linear_vel) + "\n";
+//  debug_info += "Linear vel: " + String(current_linear_vel) + "\n";
+//  debug_info += "Angular vel goal: " + String(angular_vel) + "\n";
+//  debug_info += "Angular vel: " + String(current_angular_vel);
+//  debug_print(debug_info);
 }
 
 
@@ -382,6 +364,7 @@ void update_pan_and_read_sonar() {
   current_time = millis();
   if (current_time - time_of_last_sonar_pan > sonar_pan_time_interval) {
     
+    // Increment servo angle
     sonar_pan_angle += sonar_pan_angle_increment;
     
     // If the sonar pan servo has reached the end of a sweep, change direction
@@ -394,16 +377,13 @@ void update_pan_and_read_sonar() {
       sonar_pan_angle = 180;
     }
 
-    // Move the servo
+    // Write the new angle to the servo
     sonar_pan_servo.write(sonar_pan_angle);
     time_of_last_sonar_pan = millis();
   }
-  // Running average of a few sonar readings
-  for (int i=0; i<SONAR_RUN_AVG_LEN; i++) {
-    sonar_reading += analogRead(SONAR_PIN)/100.0;
-    delay(1);
-  }
-  sonar_reading /= float(SONAR_RUN_AVG_LEN); // divide total by number of readings
+  
+  // Publish sonar data
+  sonar_reading = analogRead(SONAR_PIN)/100.0;
   sonar_point_id ++;
   sonar_data_msg.header.seq = sonar_point_id;
   sonar_data_msg.header.stamp.sec = millis()/1000;
@@ -448,106 +428,6 @@ void check_ir_sensors() {
       ir_estop_publisher.publish(&ir_estop_msg);
     }
   }
-}
-
-
-// Blink all NeoPixels on and off
-void blink() {
-
-  current_time = millis();
-  
-  if(current_time - blink_time > delay_period){
-    blinked = !blinked;
-    
-    // Logic to do turning/stopped lights
-    if(blinked){
-      if (linear_vel == 0 && angular_vel == 0 && ir_estop == 1)
-        change_all_colors(purple);
-      else if (linear_vel == 0 && angular_vel == 0)
-        change_all_colors(red);
-      else if (ir_estop == 1)
-        change_all_colors(blue);
-      else if (angular_vel < -3){ // turning left
-        if(linear_vel>=0)
-          change_left_colors(white);
-        else
-          change_left_colors(yellow);
-      }
-      else if (angular_vel > 3){ // turning right
-        if(linear_vel>=0)
-          change_right_colors(white);
-        else
-          change_right_colors(yellow);
-      }
-      else if (linear_vel >= 0)
-        change_all_colors(white);
-      else
-        change_all_colors(yellow);
-    }
-    else
-      change_all_colors(off);
-    
-    blink_time = millis();
-  }
-}
-
-
-// Helper function to make all NeoPixels a given color
-void change_all_colors(uint32_t color) {
-  
-  for (int i = 0; i < 8; i++)
-  {
-    left_strip.setPixelColor(i,color);
-    right_strip.setPixelColor(i,color);
-  }
-  for (int i = 0; i < 12; i++)
-  {
-    left_ring.setPixelColor(i,color);
-    right_ring.setPixelColor(i,color);
-  }
-  left_strip.show();
-  right_strip.show();
-  left_ring.show();
-  right_ring.show();
-}
-
-
-// Helper functions for right and left banks of lights
-void change_left_colors(uint32_t color) {
-  
-  for (int i = 0; i < 8; i++)
-  {
-    left_strip.setPixelColor(i,color);
-    right_strip.setPixelColor(i,off);
-  }
-  for (int i = 0; i < 12; i++)
-  {
-    left_ring.setPixelColor(i,color);
-    right_ring.setPixelColor(i,off);
-  }
-  left_strip.show();
-  right_strip.show();
-  left_ring.show();
-  right_ring.show();
-}
-
-
-void change_right_colors(uint32_t color) {
-  
-  for (int i = 0; i < 8; i++)
-  {
-    left_strip.setPixelColor(i,off);
-    right_strip.setPixelColor(i,color);
-  }
-  for (int i = 0; i < 12; i++)
-  {
-    left_ring.setPixelColor(i,off);
-    right_ring.setPixelColor(i,color);
-  }
-  left_strip.show();
-  right_strip.show();
-  left_ring.show();
-  right_ring.show();
 }
 
 
