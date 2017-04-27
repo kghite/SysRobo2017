@@ -12,6 +12,7 @@
 #include <Adafruit_TiCoServo.h>
 #include <mystery_machine/SonarScan.h>
 
+
 #define USB_CON
 #define PI 3.14159265358979323846
 
@@ -20,25 +21,14 @@
 unsigned long current_time;
 
 // Pins and servo objects for Roboclaw control
-const byte FORWARD_PIN = 6;
-const byte TURN_PIN = 7;
+const uint8_t FORWARD_PIN = 6;
+const uint8_t TURN_PIN = 7;
 Adafruit_TiCoServo forward_channel;
 Adafruit_TiCoServo turn_channel;
 int linear_vel =  0;
 int angular_vel = 0;
 int current_linear_vel = 0;
 int current_angular_vel = 0;
-
-// Variables for panning sonar servo and sonar sensor
-const byte SONAR_PIN = A7;
-const byte SONAR_PAN_PIN = 45;
-Adafruit_TiCoServo sonar_pan_servo;
-uint8_t sonar_pan_angle = 90;
-unsigned long time_of_last_sonar_pan = millis();
-uint8_t sonar_pan_time_interval = 15;
-uint8_t sonar_pan_angle_increment = 1;
-float sonar_reading;
-int sonar_point_id = 0;
 
 // Define estop pin
 const byte ESTOP_PIN = 42;
@@ -48,18 +38,6 @@ const byte IR_PIN_1 = A0;
 const byte IR_PIN_2 = A1;
 const int ir_low_threshold  = 300;
 uint8_t ir_estop = 0;
-
-// Motor encoder globals
-const uint8_t LEFT_ENCODER_PIN_A = 18;
-const uint8_t LEFT_ENCODER_PIN_B = 19;
-long left_encoder_pos = 0;
-boolean left_encoder_updated = false;
-const uint8_t RIGHT_ENCODER_PIN_A = 20;
-const uint8_t RIGHT_ENCODER_PIN_B = 21;
-long right_encoder_pos = 0;
-boolean right_encoder_updated = false;
-const int MAX_ENCODER_VAL = 32767;
-const int MIN_ENCODER_VAL = -32768;
 
 // Define LIDAR tilt servo
 const uint8_t LIDAR_TILT_PIN = 8;
@@ -161,29 +139,19 @@ void setup() {
   // Initialize timing things
   current_time = millis();
   
+  setup_encoders();
+  
+  setup_sonar();
+  
   setup_lights();
   
   // Define pin modes
   pinMode(ESTOP_PIN, INPUT);
-  pinMode(SONAR_PAN_PIN, INPUT);
-  
-  // Setup encoders and encoder interrupts
-  pinMode(LEFT_ENCODER_PIN_A, INPUT);
-  digitalWrite(LEFT_ENCODER_PIN_A, HIGH);
-  pinMode(LEFT_ENCODER_PIN_B, INPUT);
-  digitalWrite(LEFT_ENCODER_PIN_B, HIGH);
-  attachInterrupt(digital_pin_to_interrupt(LEFT_ENCODER_PIN_A), update_left_encoder, CHANGE);
-  pinMode(RIGHT_ENCODER_PIN_A, INPUT);
-  digitalWrite(RIGHT_ENCODER_PIN_A, HIGH);
-  pinMode(RIGHT_ENCODER_PIN_B, INPUT);
-  digitalWrite(RIGHT_ENCODER_PIN_B, HIGH);
-  attachInterrupt(digital_pin_to_interrupt(RIGHT_ENCODER_PIN_A), update_right_encoder, CHANGE);
-  
+
   // Attach Servo objects to correct pins
   forward_channel.attach(FORWARD_PIN);
   turn_channel.attach(TURN_PIN);
   lidar_tilt_servo.attach(LIDAR_TILT_PIN);
-  sonar_pan_servo.attach(SONAR_PAN_PIN);
   
   // Initialize ROS topics
   nh.initNode();
@@ -205,8 +173,8 @@ void loop() {
   check_ir_sensors();
   update_drive_motors();
   update_pan_and_read_sonar();
-  blink_lights();
   check_encoders();
+  blink_lights();
   
   // Run ros callbacks
   nh.spinOnce();
@@ -257,7 +225,7 @@ void set_audio_state() {
     }
     
     // 000X
-    if (decomposed_audio_write_1 >= 1) {
+    if (decomposed_audio_state >= 1) {
       decomposed_audio_state %= 1;
       audio_state_write_1 = 1;
     }
@@ -273,116 +241,27 @@ void set_audio_state() {
 }
 
 
-// Check if new encoder values have been read - if so, publish them
-void check_encoders() {
-  
-  check_left_encoder();
-  check_right_encoder();
-}
-
-
-// Check if new left_encoder values have been read - if so, publish them
-void check_left_encoder() {
-  
-  if (left_encoder_updated) {
-    left_encoder_msg.data = left_encoder_pos;
-    left_encoder_publisher.publish(&left_encoder_msg);
-    left_encoder_updated = false;
-  }
-}
-
-
-// Check if new right_encoder values have been read - if so, publish them
-void check_right_encoder() {
-  
-  if (right_encoder_updated) {
-    right_encoder_msg.data = right_encoder_pos;
-    right_encoder_publisher.publish(&right_encoder_msg);
-    right_encoder_updated = false;
-  }
-}
-
-
-void update_left_encoder() {
-  
-  int channel_A = digitalRead(LEFT_ENCODER_PIN_A);
-  int channel_B = digitalRead(LEFT_ENCODER_PIN_B);
-  if (channel_A == channel_B) {
-    // Decrement encoder value unless it is at min, in which case it should wrap
-    if (left_encoder_pos <= MIN_ENCODER_VAL) {
-      left_encoder_pos = MAX_ENCODER_VAL;
-    }
-    else {
-      left_encoder_pos--;
-    }
-  }
-  else {
-    // Increment encoder value unless it is at max, in which case it should wrap
-    if (left_encoder_pos >= MAX_ENCODER_VAL) {
-      left_encoder_pos = MIN_ENCODER_VAL;
-    }
-    else {
-      left_encoder_pos++;
-    }
-  }
-  
-  left_encoder_updated = true;
-}
-
-
-void update_right_encoder() {
-  
-  int channel_A = digitalRead(RIGHT_ENCODER_PIN_A);
-  int channel_B = digitalRead(RIGHT_ENCODER_PIN_B);
-  if (channel_A == channel_B) {
-    // Increment encoder value unless it is at max, in which case it should wrap
-    if (right_encoder_pos >= MAX_ENCODER_VAL) {
-      right_encoder_pos = MIN_ENCODER_VAL;
-    }
-    else {
-      right_encoder_pos++;
-    }
-  }
-  else {
-    // Decrement encoder value unless it is at min, in which case it should wrap
-    if (right_encoder_pos <= MIN_ENCODER_VAL) {
-      right_encoder_pos = MAX_ENCODER_VAL;
-    }
-    else {
-      right_encoder_pos--;
-    }
-  }
-  
-  right_encoder_updated = true;
-}
-
-
-// Update motor speeds
+// Send current linear and angular velocity commands to the drive motors
 void update_drive_motors() {
   
   // The ir_estop is the only estop the Arduino has to tell itself to stop via software
-  if (ir_estop == 1 || odroid_estop == 1){
+  if (ir_estop == 1 || odroid_estop == 1) {
    forward_channel.write(90);
     turn_channel.write(90);
     current_linear_vel = 0;
     current_angular_vel = 0;
   }
-  else{
+  else {
+    // Write velocities to drive motors
     forward_channel.write(90 + current_linear_vel);
     turn_channel.write(90 - current_angular_vel);
     
-    if (linear_vel > current_linear_vel) {
-      current_linear_vel += 1;
+    // Slowly ramp current velocities to a setpoint value
+    if (linear_vel != current_linear_vel) {
+      current_linear_vel += (linear_vel > current_linear_vel) ? 1 : -1;
     }
-    else if (linear_vel < current_linear_vel) {
-      current_linear_vel -= 1;
-    }
-      
-    if (angular_vel > current_angular_vel) {
-      current_angular_vel += 1;
-    }
-    else if (angular_vel < current_angular_vel) {
-      current_angular_vel -= 1;
+    if (angular_vel != current_angular_vel) {
+      current_angular_vel += (angular_vel > current_angular_vel) ? 1 : -1;
     }
   }
   
@@ -395,44 +274,6 @@ void update_drive_motors() {
 //  debug_print(debug_info);
 }
 
-
-void update_pan_and_read_sonar() {
-
-  // If enough time has passed, move the sonar pan servo
-  current_time = millis();
-  if (current_time - time_of_last_sonar_pan > sonar_pan_time_interval) {
-    
-    // Increment servo angle
-    sonar_pan_angle += sonar_pan_angle_increment;
-    
-    // If the sonar pan servo has reached the end of a sweep, change direction
-    if (sonar_pan_angle <= 0) {
-      sonar_pan_angle_increment = 1;
-      sonar_pan_angle = 0;
-    }
-    else if (sonar_pan_angle >= 180) {
-      sonar_pan_angle_increment = -1;
-      sonar_pan_angle = 180;
-    }
-
-    // Write the new angle to the servo
-    sonar_pan_servo.write(sonar_pan_angle);
-    time_of_last_sonar_pan = millis();
-  }
-  
-  // Publish sonar data
-  sonar_reading = analogRead(SONAR_PIN)/100.0;
-  sonar_point_id ++;
-  sonar_data_msg.header.seq = sonar_point_id;
-  sonar_data_msg.header.stamp.sec = millis()/1000;
-  sonar_data_msg.header.stamp.nsec = (millis() * 1000) % 1000000;
-  sonar_data_msg.header.frame_id = "base_sonar";
-  sonar_data_msg.range_min = 0.05;
-  sonar_data_msg.range_max = 2.00;
-  sonar_data_msg.range = sonar_reading;
-  sonar_data_msg.angle = sonar_pan_angle; // angle in degrees where 0 is right and 180 is left
-  sonar_data_publisher.publish(&sonar_data_msg);
-}
 
 
 // See if we need to estop based on IR input
