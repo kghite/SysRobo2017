@@ -4,6 +4,7 @@
 #include <geometry_msgs/Point.h>
 #include <sensor_msgs/LaserScan.h>
 #include <std_msgs/String.h>
+#include <std_msgs/Int8.h>
 #include <std_msgs/Int16.h>
 #include <std_msgs/Int32.h>
 #include <std_msgs/Float32MultiArray.h>
@@ -77,6 +78,14 @@ uint8_t curr_audio_state = 0;
 uint8_t prev_audio_state = 0;
 
 
+// Define pins for commanding second arduino to play Audio
+const int AUDIO_STATE_WRITE_PIN = A3;
+const int NUM_AUDIO_STATES = 5;
+const int AUDIO_STATE_MAX_VOLTAGE = 1023;
+int prev_audio_state = 0;
+int curr_audio_state = 0;
+
+
 // Set up ROS node handling and feedback channel
 ros::NodeHandle nh;
 
@@ -118,7 +127,7 @@ ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("cmd_vel", &cmd_vel_callback )
 
 
 // Callback function for an IR Estop message
-void ir_estop_callback( const std_msgs::Int16& msg ) {
+void ir_estop_callback(const std_msgs::Int16& msg) {
   
   // Check and see if the midbrain says it's okay to move
   int estop_message = msg.data;
@@ -128,19 +137,30 @@ void ir_estop_callback( const std_msgs::Int16& msg ) {
   }
   
 }
-ros::Subscriber<std_msgs::Int16>ir_estop_sub("ir_estop",&ir_estop_callback);
+ros::Subscriber<std_msgs::Int16> ir_estop_sub("ir_estop",&ir_estop_callback);
 
 
 // Callback function for an Odroid Estop message
 int odroid_estop = 0;
-void odroidEstopCallback( const std_msgs::Int16& msg ) {
+void odroid_estop_callback(const std_msgs::Int16& msg) {
   
   // Just update this estop.. Pretty easy
   int estop_message = msg.data;
   
   odroid_estop = estop_message;
 }
-ros::Subscriber<std_msgs::Int16>odroid_estop_sub("odroid_estop",&odroidEstopCallback);
+ros::Subscriber<std_msgs::Int16> odroid_estop_sub("odroid_estop",&odroid_estop_callback);
+
+
+// Callback function for a audio_cmd message
+void audio_cmd_callback(const std_msgs::Int8& msg) {
+  
+  prev_audio_state = curr_audio_state;
+  curr_audio_state  = msg.data;
+  
+  set_audio_state();
+}
+ros::Subscriber<std_msgs::Int8> audio_cmd_sub("audio_cmd", &audio_cmd_callback);
 
 
 // SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
@@ -213,6 +233,15 @@ void debug_print(String message) {
   message.toCharArray(charBuf,100);    
   debug_msg.data = charBuf;
   debug_publisher.publish(&debug_msg);
+}
+
+
+// Set output voltage on AUDIO_STATE_WRITE_PIN pin to the correct value to tell the other arduino
+// which audio file it should play.
+void set_audio_state() {
+  if (curr_audio_state != prev_audio_state) {
+    analogWrite(AUDIO_STATE_WRITE_PIN, curr_audio_state * AUDIO_STATE_MAX_VOLTAGE / NUM_AUDIO_STATES);
+  }
 }
 
 
@@ -362,6 +391,7 @@ void update_pan_and_read_sonar() {
     sonar_pan_servo.write(sonar_pan_angle);
     time_of_last_sonar_pan = millis();
   }
+  
   // Publish sonar data
   sonar_reading = analogRead(SONAR_PIN)/100.0;
   sonar_point_id ++;
