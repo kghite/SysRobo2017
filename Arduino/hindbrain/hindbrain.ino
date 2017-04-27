@@ -66,6 +66,16 @@ Adafruit_TiCoServo lidar_tilt_servo;
 const int middle_tilt_position = 110;
 int current_tilt_position = middle_tilt_position;
 
+// Sending audio state through digital pins
+const int AUDIO_STATE_WRITE_PIN_1 = 5; // TODO: define all these pins to real digital pins
+const int AUDIO_STATE_WRITE_PIN_2 = 6;
+const int AUDIO_STATE_WRITE_PIN_4 = 7;
+uint8_t audio_state_write_1 = 0;
+uint8_t audio_state_write_2 = 0;
+uint8_t audio_state_write_4 = 0;
+uint8_t curr_audio_state = 0;
+uint8_t prev_audio_state = 0;
+
 
 // Set up ROS node handling and feedback channel
 ros::NodeHandle nh;
