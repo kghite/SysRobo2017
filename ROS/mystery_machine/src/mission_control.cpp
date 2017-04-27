@@ -175,7 +175,6 @@ FloorSet FSM::order_maps(std::string map_store_file,
  */
 void FSM::call_elevator() {
 
-
     // Publish audio state
     std_msgs::Int8 tmp = std_msgs::Int8();
     tmp.data = 1;
@@ -355,6 +354,7 @@ void FSM::odomResponse(const nav_msgs::Odometry odom) {
 
 
 int main(int argc, char **argv) {
+
     ros::init(argc, argv, "mission_control");
     ros::NodeHandle n;
     ros::Rate loop_rate(10);
@@ -371,17 +371,19 @@ int main(int argc, char **argv) {
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
 	  // Subscribers
-    ros::Subscriber sub_scan = n.subscribe("/scan", 1000, &FSM::scanResponse, &mission_controller);
-    ros::Subscriber sub_odom = n.subscribe("/odom", 1000, &FSM::odomResponse, &mission_controller);
+    ros::Subscriber sub_scan = n.subscribe("/scan", 1000, &FSM::scanResponse,
+            &mission_controller);
+    ros::Subscriber sub_odom = n.subscribe("/odom", 1000, &FSM::odomResponse,
+            &mission_controller);
 
-		MoveBaseClient ac("move_base", true);
+    MoveBaseClient ac("move_base", true);
 
-	  // Move base server
-	  while(!ac.waitForServer(ros::Duration(5.0))){
-	    ROS_INFO("Waiting for the move_base action server to come up");
-	  }
+    // Move base server
+    while(!ac.waitForServer(ros::Duration(5.0))) {
+        ROS_INFO("Waiting for the move_base action server to come up");
+    }
 
-	  int lastRock = 0;
+    int lastRock = 0;
 
     while (ros::ok()) {
 
@@ -432,14 +434,16 @@ int main(int argc, char **argv) {
         // }
 
         ROS_INFO("Sending goal");
-	  		ac.sendGoal(goal);
+        ac.sendGoal(goal);
 
-	  		ac.waitForResult();
+        ac.waitForResult();
 
-	  		if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-	    			ROS_INFO("Move succeeded");
-	  		else
-	    			ROS_INFO("Move failed");
+        if (ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            ROS_INFO("Move succeeded");
+        }
+        else {
+            ROS_INFO("Move failed");
+        }
 
         loop_rate.sleep();
         ros::spinOnce();
