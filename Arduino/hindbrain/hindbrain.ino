@@ -31,11 +31,11 @@ int current_linear_vel = 0;
 int current_angular_vel = 0;
 
 // Define estop pin
-const byte ESTOP_PIN = 42;
+const uint8_t ESTOP_PIN = 42;
 
 // Define IR sensor variables
-const byte IR_PIN_1 = A0;
-const byte IR_PIN_2 = A1;
+const uint8_t IR_PIN_1 = A0;
+const uint8_t IR_PIN_2 = A1;
 const int ir_low_threshold  = 300;
 uint8_t ir_estop = 0;
 
