@@ -24,15 +24,15 @@ class Feature_Matcher():
         self.last_map = None
         #path to feature to match in greyscale image form
         self.featurepath = "elevator_template.jpg"
-        #load feature to compare to 
+        #load feature to compare to
         #self.features = np.load(self.featurepath)
         #image_cv2 = cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
-        
+
         # load template sign images as grayscale
         self.elevators = cv2.imread(featurepath,0)
-        
+
         map_pub = rospy.Publisher('/elevatormap',OccupancyGrid)
- 
+
     def match_features(self):
         """ Matches features against template and publishes map with elevator location"""
         #load images into memory so if they're updated by a callback nothing gets broken
@@ -53,15 +53,13 @@ class Feature_Matcher():
         newgrid.info.height = self.map_height
         newgrid.data = newgridarr
 
-        #only publish if confidence is high
-        if confidence > 60:
-            map_pub.publish(newgrid)
-
-
+        #TODO: CONFIDENCE NUMBERS ARE WEIRD. Either scale them or adjust this threshhold
+        if confidence > 60: #only publish if confidence is high
+            self.map_pub.publish(newgrid)
 
     def process_occupancy_grid(self, occupancy_grid):
         '''
-        Input: Occuapancy grid 
+        Input: Occupancy grid
         Output: Binary openCV image of occupancy grid
         '''
         #read into numpy array and shape correctly
@@ -70,17 +68,17 @@ class Feature_Matcher():
         self.map_height = occupancy_grid.info.height
         np_arr = np.reshape(np_arr,(occupancy_grid.info.width, occupancy_grid.info.height))
         #threshold to 0s and 1s
-        binary_np = stats.threshold(stats.threshold(np_arr,50,101,1),50)
-        image_cv2 = cv2.imdecode(np_arr, cv2.IMREAD_GRAYSCALE)
-        #cv2.imshow(image_cv2)
-        self.last_map = image_cv2
+        binary_np = stats.threshold(stats.threshold(np_arr,0,101,0),0,1,255)
+        self.last_map = cv2.imwrite(self.map_path,binary_np)
+        print 'RECEIVED'
+        #initiate feature matching. Whenever you receive a map, find elevators!
+        self.match_features()
 
-
-    ##Main
-
-    def run(self):    
-        self.sendMessage()
-        self.sleepy.sleep()
+    def run(self):
+        while not rospy.is_shutdown():
+            #although it doesn't look like anything is running, trust us.
+            #Feature matching is initiated by receiving a map from the /map rostopic.
+            self.sleepy.sleep()
 
 feature = Feature_Matcher()
 feature.run()

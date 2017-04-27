@@ -2,13 +2,11 @@
  * This sketch grab's the robot's current state from our finite state machine,
  * and triggers different audio clips in response. 
  */
- 
+
 #include <SPI.h>
 #include <SdFat.h>
 #include <SdFatUtil.h>
 #include <SFEMP3Shield.h>
-#include <ros.h>
-#include <std_msgs/Int16.h> // TO-DO: confirm which message type to import.
 #define USB_CON
 
 // Set up objects and vars for MP3 playback.
@@ -17,47 +15,15 @@ SFEMP3Shield MP3player;
 int16_t last_ms_char;
 int8_t buffer_pos;
 
-// Set up ROS node handling & feedback channel.
-ros::NodeHandle nh;
-
-// Set up ROS subscribers.
-ros::Subscriber<std_msgs::Int16> bot_state_sub("bot_state", &audioCb);
-
-//------------------------------------------------------------------------------
-/*
- * Bot state subscriber callback: Mapping the robot's state to the appropriate 
- * audio clip.
- * 
- * Index    Filename        State(str)     Action                   Audio Clip
- * -----    --------        ---------      ---------                ----------
- * 00001    TRACK004.mp3    0: within      playing elev music       Never Gonna Give You Up
- * 00002    TRACK001.mp3    1: asking      requesting aid @ elev    "Hello. Can you pls call elev for me?"
- * 00003    TRACK002.mp3    2: entering    entering elev            "Entering elevator; pls stand clear."
- * 00004    TRACK003.mp3    3: exiting     exiting elev             "Exiting elevator; pls stand clear."
- * 00005    TRACK005.mp3    0: within      playing elev music       generic elevator music
- * 00006    TRACK006.mp3    0: within      playing elev music       Scooby Doo theme song
- */
-void audioCb( int std_msgs::Int16& state ) {
-
-  char audio_index;
-  int track_val;
-
-  // Convert state to appropriate audio index.
-  if (state == 1) audio_index = '00002';
-  else if (state == 2) audio_index = '00003';
-  else if (state == 3) audio_index = '00004';
-  else if (state == 0) {
-    track_val random(0,2);
-    if (track_val == 0) audio_index = '00001';
-    else if (track_val == 1) audio_index = '00005';
-    else if (track_val == 2) audio_index = '00006';
-  }
-
-  parse_menu(audio_index);    // Send audio_index to parse_menu() to play appropriate track.
-
-  delay(100);
-  
-}
+// Reading audio state from digital pins
+const int AUDIO_STATE_READ_PIN_1 = 5;
+const int AUDIO_STATE_READ_PIN_2 = 6;
+const int AUDIO_STATE_READ_PIN_4 = 7;
+uint8_t audio_state_read_1 = 0;
+uint8_t audio_state_read_2 = 0;
+uint8_t audio_state_read_4 = 0;
+uint8_t curr_audio_state = 0;
+uint8_t prev_audio_state = 0;
 
 uint32_t  millis_prv;
 
@@ -78,6 +44,7 @@ void setup() {
   uint8_t result; //result code from some function as to be tested at later time.
 
   Serial.begin(115200);
+//  Serial.begin(9600);
 
   if(!sd.begin(SD_SEL, SPI_FULL_SPEED)) sd.initErrorHalt();  //Initialize the SdCard.
   if(!sd.chdir("/")) sd.errorHalt("sd.chdir");               // depending upon your SdCard environment, SPI_HAVE_SPEED may work better.
@@ -87,8 +54,6 @@ void setup() {
   last_ms_char = millis();  // stroke the inter character timeout.
   buffer_pos = 0;           // start the command string at zero length.
 
-  nh.subscribe(bot_state_sub);
-
 }
 
 //------------------------------------------------------------------------------
@@ -96,8 +61,85 @@ void setup() {
  * SPINNNYYY
  */
 void loop() {
-  nh.spinOnce();
-  delay(1);
+  
+  update_state();
+  
+  play_state_audio();
+  
+  delay(100);
+}
+
+void update_state() {
+
+  // Digital signals sent from primary arduino, which will be treated as 3 bit binary number
+  audio_state_read_1 = digitalRead(AUDIO_STATE_READ_PIN_1); // first digit of binary value:  000X
+  audio_state_read_2 = digitalRead(AUDIO_STATE_READ_PIN_2); // second digit of binary value: 00X0
+  audio_state_read_4 = digitalRead(AUDIO_STATE_READ_PIN_4); // third digit of binary value:  0X00
+  
+  // Read digital values like a binary number
+  prev_audio_state = curr_audio_state;
+  curr_audio_state = (audio_state_read_4 * 4) + (audio_state_read_2 * 2) + (audio_state_read_1 * 1);
+  
+  Serial.print("Estimated state: ");
+  Serial.println(curr_audio_state);
+  
+  Serial.println("");
+}
+
+
+//------------------------------------------------------------------------------
+/*
+ * Bot state subscriber callback: Mapping the robot's state to the appropriate 
+ * audio clip.
+ * 
+ * Index    Filename        State(str)     Action                   Audio Clip
+ * -----    --------        ---------      ---------                ----------
+ * 00001    TRACK004.mp3    0: within      playing elev music       Never Gonna Give You Up
+ * 00002    TRACK001.mp3    1: asking      requesting aid @ elev    "Hello. Can you pls call elev for me?"
+ * 00003    TRACK002.mp3    2: entering    entering elev            "Entering elevator; pls stand clear."
+ * 00004    TRACK003.mp3    3: exiting     exiting elev             "Exiting elevator; pls stand clear."
+ * 00005    TRACK005.mp3    0: within      playing elev music       generic elevator music
+ * 00006    TRACK006.mp3    0: within      playing elev music       Scooby Doo theme song
+ */
+void play_state_audio() {
+
+  char audio_index;
+  int track_val;
+
+  // Convert state to appropriate audio index.
+  if (curr_audio_state != prev_audio_state) {
+    Serial.println("New audio state!");
+    switch (curr_audio_state) {
+      case 1: // calling the elevator
+        audio_index = '00002';
+        break;
+      case 2: // entering the elevator
+        audio_index = '00003';
+        break;
+      case 3: // exiting the elevator
+        audio_index = '00004';
+        break;
+      case 0: // inside the elevator
+        track_val = random(0,2);
+        switch (track_val) {
+          case 0:
+            audio_index = '00001';
+            break;
+          case 1:
+            audio_index = '00005';
+            break;
+          case 2:
+            audio_index = '00006';
+            break;
+        }
+        break;
+    }
+  }
+
+  parse_menu(audio_index);    // Send audio_index to parse_menu() to play appropriate track.
+
+  delay(100);
+  
 }
 
 //------------------------------------------------------------------------------
