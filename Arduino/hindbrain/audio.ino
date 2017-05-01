@@ -1,6 +1,6 @@
 
 // Sending audio state through digital pins
-const uint8_t AUDIO_STATE_WRITE_PIN_1 = 48; // TODO: define all these pins to real digital pins
+const uint8_t AUDIO_STATE_WRITE_PIN_1 = 48;
 const uint8_t AUDIO_STATE_WRITE_PIN_2 = 49;
 const uint8_t AUDIO_STATE_WRITE_PIN_4 = 46;
 uint8_t audio_state_write_1 = 0;
