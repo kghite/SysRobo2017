@@ -7,13 +7,13 @@
  * exploration with the Mystery Machine  
 */
 
+
 #include "string"
 #include "list"
 #include "iostream"
 #include "math.h"
 
 #include "ros/ros.h"
-
 #include "geometry_msgs/Pose.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Twist.h"
@@ -27,11 +27,11 @@
 #include <move_base_msgs/MoveBaseAction.h>
 #include <actionlib/client/simple_action_client.h>
 
-// Nav stack simple goals interface
-typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
-move_base_msgs::MoveBaseGoal goal;
 
-int lastRock;
+// Nav stack simple goals interface
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>
+        MoveBaseClient;
+move_base_msgs::MoveBaseGoal goal;
 
 // Set up state values
 enum State {
@@ -59,9 +59,8 @@ struct FloorSet {
     float probs[];
 };
 
-
 // declaring publishers
-ros::Publisher audio_pub;
+ros::Publisher audio_cmd_pub;
 ros::Publisher cmd_vel_pub;
 
 
@@ -70,6 +69,9 @@ class FSM {
     public:  
         State state;
         float elev_vel;   // velocity parameter
+        bool scan_changes;
+        // Direction to pace while calling elevator
+        uint8_t calling_elev_pace_dir = 1;
 
         // declaring scanResponse info
         bool scan_changes_left; // 0 = no changes from old; 
@@ -101,7 +103,6 @@ class FSM {
         // nav_msgs::Odometry odom;
         sensor_msgs::LaserScan scan;
         std_msgs::Int8 floor;
-
 
         // declaring methods
         float explore_floor();
@@ -185,20 +186,13 @@ void FSM::call_elevator() {
     // Publish audio state
     std_msgs::Int8 tmp = std_msgs::Int8();
     tmp.data = 1;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
-    // Rock back and forth
-	  goal.target_pose.header.frame_id = "base_link";
-	  goal.target_pose.header.stamp = ros::Time::now();
-
-	  if (lastRock == 0) {
-	  		goal.target_pose.pose.position.x = 0.1;
-	  		lastRock = 1;
-	  }
-	  else {
-	  		goal.target_pose.pose.position.x = -0.1;
-	  		lastRock = 0;
-	  }
+    // Make the robot pace back and forth
+    goal.target_pose.header.frame_id = "base_link";
+    goal.target_pose.header.stamp = ros::Time::now();
+    // Change direction and then set goal
+    goal.target_pose.pose.position.x = (calling_elev_pace_dir *= 1);
 }
 
 /* 
@@ -215,7 +209,7 @@ void FSM::enter_elevator() {
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = state;
     tmp.data = 2;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Enter elevator slowly
     // TODO: how to set wpt to elevator???  @Katie
@@ -253,7 +247,7 @@ void FSM::ride_elevator() {
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = state;
     tmp.data = 3;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     if (FSM::scan_changes == 0) {
         FSM::state = exiting_elevator;
@@ -272,7 +266,7 @@ FloorSet FSM::exit_elevator() {
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = state;
     tmp.data = 4;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Exit elevator by moving forward slowly
     // TODO: confirm this velocity
@@ -313,14 +307,13 @@ void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
 
     // TODO: 
     // First, determine if 0-256 is actually left.  Or is it right?
-    // Second, make comparison more robust, i.e. not just a straight comparison between old and new (because tolerance in readings allows for slop)
-    std::vector<float> scan_new_left( 
-        FSM::scan_new.begin()+0,
-        FSM::scan_new.begin(1)+256);
+    // Second, make comparison more robust, i.e. not just a straight comparison
+    // between old and new (because tolerance in readings allows for slop)
+    std::vector<float> scan_new_left(FSM::scan_new.begin()+0,
+            FSM::scan_new.begin()+256);
 
-    std::vector<float> scan_new_right( 
-        FSM::scan_new.begin()+256,
-        FSM::scan_new.begin()+512);
+    std::vector<float> scan_new_right(FSM::scan_new.begin()+256,
+            FSM::scan_new.begin()+512);
 
 
     // compare to scan_old, setting bool scan_changes appropriately
@@ -389,10 +382,10 @@ int main(int argc, char **argv) {
     mission_controller.floor.data = 1;
 
     // Publishers
-    audio_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
+    audio_cmd_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
-	  // Subscribers
+    // Subscribers
     ros::Subscriber sub_scan = n.subscribe("/scan", 1000, &FSM::scanResponse,
             &mission_controller);
     ros::Subscriber sub_odom = n.subscribe("/odom", 1000, &FSM::odomResponse,

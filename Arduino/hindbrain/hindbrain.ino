@@ -45,36 +45,17 @@ Adafruit_TiCoServo lidar_tilt_servo;
 const uint8_t middle_tilt_position = 110;
 int current_tilt_position = middle_tilt_position;
 
-// Sending audio state through digital pins
-const uint8_t AUDIO_STATE_WRITE_PIN_1 = 5; // TODO: define all these pins to real digital pins
-const uint8_t AUDIO_STATE_WRITE_PIN_2 = 6;
-const uint8_t AUDIO_STATE_WRITE_PIN_4 = 7;
-uint8_t audio_state_write_1 = 0;
-uint8_t audio_state_write_2 = 0;
-uint8_t audio_state_write_4 = 0;
-uint8_t curr_audio_state = 0;
-uint8_t prev_audio_state = 0;
 
-
-// Set up ROS node handling and feedback channel
+// ROS node handle
 ros::NodeHandle nh;
 
 
-// Set up ROS publishers
+// ROS publishers
 std_msgs::String debug_msg;
-ros::Publisher debug_publisher("debug", &debug_msg);
+ros::Publisher debug_pub("debug", &debug_msg);
 
 std_msgs::Int16 ir_estop_msg;
-ros::Publisher ir_estop_publisher("ir_estop", &ir_estop_msg);
-
-mystery_machine::SonarScan sonar_data_msg;
-ros::Publisher sonar_data_publisher("sonar_data", &sonar_data_msg);
-
-std_msgs::Int16 left_encoder_msg;
-ros::Publisher left_encoder_publisher("lwheel", &left_encoder_msg);
-
-std_msgs::Int16 right_encoder_msg;
-ros::Publisher right_encoder_publisher("rwheel", &right_encoder_msg);
+ros::Publisher ir_estop_pub("ir_estop", &ir_estop_msg);
 
 
 // Callback function for a Twist message
@@ -122,47 +103,34 @@ void odroid_estop_callback(const std_msgs::Int16& msg) {
 ros::Subscriber<std_msgs::Int16> odroid_estop_sub("odroid_estop",&odroid_estop_callback);
 
 
-// Callback function for a audio_cmd message
-void audio_cmd_callback(const std_msgs::Int8& msg) {
-  
-  prev_audio_state = curr_audio_state;
-  curr_audio_state  = msg.data;
-  
-  set_audio_state();
-}
-ros::Subscriber<std_msgs::Int8> audio_cmd_sub("audio_cmd", &audio_cmd_callback);
-
-
 // SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS
 void setup() {
   
-  // Initialize timing things
+  // ROS Node
+  nh.initNode();
+  
+  // ROS publishers
+  nh.advertise(debug_pub);
+  nh.advertise(ir_estop_pub);
+  
+  // ROS subscribers
+  nh.subscribe(cmd_vel_sub);
+  nh.subscribe(ir_estop_sub);
+  nh.subscribe(odroid_estop_sub);
+  
+  // Initialize timing
   current_time = millis();
-  
-  setup_encoders();
-  
-  setup_sonar();
-  
-  setup_lights();
-  
-  // Define pin modes
-  pinMode(ESTOP_PIN, INPUT);
 
   // Attach Servo objects to correct pins
   forward_channel.attach(FORWARD_PIN);
   turn_channel.attach(TURN_PIN);
   lidar_tilt_servo.attach(LIDAR_TILT_PIN);
   
-  // Initialize ROS topics
-  nh.initNode();
-  nh.advertise(debug_publisher);
-  nh.advertise(ir_estop_publisher);
-  nh.advertise(sonar_data_publisher);
-  nh.advertise(left_encoder_publisher);
-  nh.advertise(right_encoder_publisher);
-  nh.subscribe(cmd_vel_sub);
-  nh.subscribe(ir_estop_sub);
-  nh.subscribe(odroid_estop_sub);
+  // System setup
+  setup_encoders();
+  setup_sonar();
+  setup_lights();
+  setup_audio();
 }
 
 
@@ -192,59 +160,14 @@ void debug_print(String message) {
   char charBuf[100];
   message.toCharArray(charBuf,100);    
   debug_msg.data = charBuf;
-  debug_publisher.publish(&debug_msg);
-}
-
-
-// Set output voltage on AUDIO_STATE_WRITE_PIN pin to the correct value to tell the other arduino
-// which audio file it should play.
-void set_audio_state() {
-  
-  // If this is a new audio state
-  if (curr_audio_state != prev_audio_state) {
-    
-    // Decompose curr_audio_state into a 3 bit binary number
-    uint8_t decomposed_audio_state = curr_audio_state;
-    
-    // 0X00
-    if (decomposed_audio_state >= 4) {
-      decomposed_audio_state %= 4;
-      audio_state_write_4 = 1;
-    }
-    else {
-      audio_state_write_4 = 0;
-    }
-    
-    // 00X0
-    if (decomposed_audio_state >= 2) {
-      decomposed_audio_state %= 2;
-      audio_state_write_2 = 1;
-    }
-    else {
-      audio_state_write_2 = 0;
-    }
-    
-    // 000X
-    if (decomposed_audio_state >= 1) {
-      decomposed_audio_state %= 1;
-      audio_state_write_1 = 1;
-    }
-    else {
-      audio_state_write_1 = 0;
-    }
-    
-    // Write audio state as 3 bit binary number where each bit is a digital pin
-    digitalWrite(AUDIO_STATE_WRITE_PIN_4, audio_state_write_4); // 0X00
-    digitalWrite(AUDIO_STATE_WRITE_PIN_2, audio_state_write_2); // 00X0
-    digitalWrite(AUDIO_STATE_WRITE_PIN_1, audio_state_write_1); // 000X
-  }
+  debug_pub.publish(&debug_msg);
 }
 
 
 // Send current linear and angular velocity commands to the drive motors
 void update_drive_motors() {
   
-  // The ir_estop is the only estop the Arduino has to tell itself to stop via software
+  // The ir_ is the only estop the Arduino has to tell itself to stop via software
   if (ir_estop == 1 || odroid_estop == 1) {
    forward_channel.write(90);
     turn_channel.write(90);
@@ -284,28 +207,22 @@ void check_ir_sensors() {
   ir_reading_1 = analogRead(IR_PIN_1);
   ir_reading_2 = analogRead(IR_PIN_2);
   
-  if (ir_reading_1 < ir_low_threshold || ir_reading_2 < ir_low_threshold){
-    if (ir_estop == 0){
+  if (ir_reading_1 < ir_low_threshold || ir_reading_2 < ir_low_threshold) {
+    if (ir_estop == 0) {
       ir_estop = 1;
       ir_estop_msg.data = ir_estop;
-      ir_estop_publisher.publish(&ir_estop_msg);
+      ir_estop_pub.publish(&ir_estop_msg);
     }
-    
-    else if (ir_estop == 2){
-      
-      if (linear_vel > 0){
-        ir_estop = 1;
-        ir_estop_msg.data = ir_estop;
-        ir_estop_publisher.publish(&ir_estop_msg);
-      }
+    else if (ir_estop == 2 && linear_vel > 0) {
+      ir_estop = 1;
+      ir_estop_msg.data = ir_estop;
+      ir_estop_pub.publish(&ir_estop_msg);
     }
   }
-  else{
-    if (ir_estop != 0){
-      ir_estop = 0;
-      ir_estop_msg.data = ir_estop;
-      ir_estop_publisher.publish(&ir_estop_msg);
-    }
+  else if (ir_estop != 0) {
+    ir_estop = 0;
+    ir_estop_msg.data = ir_estop;
+    ir_estop_pub.publish(&ir_estop_msg);
   }
 }
 

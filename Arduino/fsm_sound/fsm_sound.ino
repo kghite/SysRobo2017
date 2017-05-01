@@ -17,8 +17,8 @@ int8_t buffer_pos;
 
 // Reading audio state from digital pins
 const int AUDIO_STATE_READ_PIN_1 = 5;
-const int AUDIO_STATE_READ_PIN_2 = 6;
-const int AUDIO_STATE_READ_PIN_4 = 7;
+const int AUDIO_STATE_READ_PIN_2 = 12;
+const int AUDIO_STATE_READ_PIN_4 = 11;
 uint8_t audio_state_read_1 = 0;
 uint8_t audio_state_read_2 = 0;
 uint8_t audio_state_read_4 = 0;
@@ -41,18 +41,22 @@ char buffer[6]; // 0-35K+null
 
 void setup() {
 
-  uint8_t result; //result code from some function as to be tested at later time.
+  //uint8_t result; //result code from some function as to be tested at later time.
 
   Serial.begin(115200);
 //  Serial.begin(9600);
 
-  if(!sd.begin(SD_SEL, SPI_FULL_SPEED)) sd.initErrorHalt();  //Initialize the SdCard.
-  if(!sd.chdir("/")) sd.errorHalt("sd.chdir");               // depending upon your SdCard environment, SPI_HAVE_SPEED may work better.
+  pinMode(AUDIO_STATE_READ_PIN_1, INPUT);
+  pinMode(AUDIO_STATE_READ_PIN_2, INPUT);
+  pinMode(AUDIO_STATE_READ_PIN_4, INPUT);
 
-  result = MP3player.begin();  //Initialize the MP3 Player Shield
+  //if(!sd.begin(SD_SEL, SPI_FULL_SPEED)) sd.initErrorHalt();  //Initialize the SdCard.
+  //if(!sd.chdir("/")) sd.errorHalt("sd.chdir");               // depending upon your SdCard environment, SPI_HAVE_SPEED may work better.
 
-  last_ms_char = millis();  // stroke the inter character timeout.
-  buffer_pos = 0;           // start the command string at zero length.
+  //result = MP3player.begin();  //Initialize the MP3 Player Shield
+
+  //last_ms_char = millis();  // stroke the inter character timeout.
+  //buffer_pos = 0;           // start the command string at zero length.
 
 }
 
@@ -64,7 +68,7 @@ void loop() {
   
   update_state();
   
-  play_state_audio();
+  //play_state_audio();
   
   delay(100);
 }
