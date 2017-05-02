@@ -31,8 +31,6 @@
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
 move_base_msgs::MoveBaseGoal goal;
 
-int lastRock;
-
 // Set up state values
 enum State {
     exploring,				//
@@ -71,17 +69,6 @@ class FSM {
         State state;
         float elev_vel;   // velocity parameter
 
-        // declaring scanResponse info
-        bool scan_changes_left; // 0 = no changes from old; 
-                                // 1 = there are changes from old
-        bool scan_changes_right;
-
-        std::vector<float> scan_old;
-        std::vector<float> scan_old_left;
-        std::vector<float> scan_old_right;
-        std::vector<float> scan_new;
-        std::vector<float> scan_new_left;
-        std::vector<float> scan_new_right;
 
         // declaring odomResponse info
         float dist_traveled;
@@ -119,6 +106,15 @@ class FSM {
         // declaring callback methods
         void scanResponse(sensor_msgs::LaserScan scan);
         void odomResponse(nav_msgs::Odometry odom);
+
+    private:
+        // FSM::CallElevator
+        int8_t curr_pace_dir = -1;
+        float left_elev_scan;
+        float right_elev_scan;
+        uint8_t left_elev_open = 0;
+        uint8_t right_elev_open = 0;
+
 };
 
 /*
@@ -126,7 +122,7 @@ class FSM {
 */
 FSM::FSM(ros::NodeHandle n) {
     elev_vel = 0.1;    // TODO: confirm this vel for elevator specifically
-    scan_changes = 0;
+    //scan_changes = 0;
 }
 
 /* 
@@ -187,18 +183,28 @@ void FSM::call_elevator() {
     tmp.data = 1;
     audio_pub.publish(tmp);
 
-    // Rock back and forth
-	  goal.target_pose.header.frame_id = "base_link";
-	  goal.target_pose.header.stamp = ros::Time::now();
+    std::vector<float> left_elev_scan( 
+        FSM::scan.begin()+256,
+        FSM::scan.begin()+511);
+    std::vector<float> right_elev_scan( 
+        FSM::scan.begin()+0,
+        FSM::scan.begin()+255);
 
-	  if (lastRock == 0) {
-	  		goal.target_pose.pose.position.x = 0.1;
-	  		lastRock = 1;
-	  }
-	  else {
-	  		goal.target_pose.pose.position.x = -0.1;
-	  		lastRock = 0;
-	  }
+    if (left_elev_open) {
+        // TODO: go into the left elevator
+    } else if (right_elev_open) {
+        // TODO: go into the right elevator
+    } else {
+        // TODO: read average of left half of scans
+        //      read average of right half scans
+        //      whichever gets bigger first decides which elevator door opens
+        left_elev_scan = scan.ranges
+        // Rock back and forth
+        goal.target_pose.header.frame_id = "base_link";
+        goal.target_pose.header.stamp = ros::Time::now();
+
+        goal.target_pose.pose.position.x = .1 * (curr_pace_dir*=-1);
+    }
 }
 
 /* 
@@ -240,9 +246,9 @@ void FSM::enter_elevator() {
         }
     }
 
-    if (FSM::scan_changes == 0) {
-        FSM::state = riding_elevator;
-    }
+    //if (FSM::scan_changes == 0) {
+        //FSM::state = riding_elevator;
+    //}
 }
 
 /* 
@@ -255,9 +261,9 @@ void FSM::ride_elevator() {
     tmp.data = 3;
     audio_pub.publish(tmp);
 
-    if (FSM::scan_changes == 0) {
-        FSM::state = exiting_elevator;
-    }
+    //if (FSM::scan_changes == 0) {
+        //FSM::state = exiting_elevator;
+    //}
 }
 
  /*
@@ -316,7 +322,7 @@ void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
     // Second, make comparison more robust, i.e. not just a straight comparison between old and new (because tolerance in readings allows for slop)
     std::vector<float> scan_new_left( 
         FSM::scan_new.begin()+0,
-        FSM::scan_new.begin(1)+256);
+        FSM::scan_new.begin()+256);
 
     std::vector<float> scan_new_right( 
         FSM::scan_new.begin()+256,
@@ -392,7 +398,7 @@ int main(int argc, char **argv) {
     audio_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
-	  // Subscribers
+    // Subscribers
     ros::Subscriber sub_scan = n.subscribe("/scan", 1000, &FSM::scanResponse,
             &mission_controller);
     ros::Subscriber sub_odom = n.subscribe("/odom", 1000, &FSM::odomResponse,
@@ -404,8 +410,6 @@ int main(int argc, char **argv) {
     while(!ac.waitForServer(ros::Duration(5.0))) {
         ROS_INFO("Waiting for the move_base action server to come up");
     }
-
-    int lastRock = 0;
 
     while (ros::ok()) {
 
