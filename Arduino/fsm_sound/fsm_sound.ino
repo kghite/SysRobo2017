@@ -41,22 +41,21 @@ char buffer[6]; // 0-35K+null
 
 void setup() {
 
-  //uint8_t result; //result code from some function as to be tested at later time.
+  uint8_t result; //result code from some function as to be tested at later time.
 
   Serial.begin(115200);
-//  Serial.begin(9600);
 
   pinMode(AUDIO_STATE_READ_PIN_1, INPUT);
   pinMode(AUDIO_STATE_READ_PIN_2, INPUT);
   pinMode(AUDIO_STATE_READ_PIN_4, INPUT);
 
-  //if(!sd.begin(SD_SEL, SPI_FULL_SPEED)) sd.initErrorHalt();  //Initialize the SdCard.
-  //if(!sd.chdir("/")) sd.errorHalt("sd.chdir");               // depending upon your SdCard environment, SPI_HAVE_SPEED may work better.
+  if(!sd.begin(SD_SEL, SPI_FULL_SPEED)) sd.initErrorHalt();  //Initialize the SdCard.
+  if(!sd.chdir("/")) sd.errorHalt("sd.chdir");               // depending upon your SdCard environment, SPI_HAVE_SPEED may work better.
 
-  //result = MP3player.begin();  //Initialize the MP3 Player Shield
+  result = MP3player.begin();  //Initialize the MP3 Player Shield
 
-  //last_ms_char = millis();  // stroke the inter character timeout.
-  //buffer_pos = 0;           // start the command string at zero length.
+  last_ms_char = millis();  // stroke the inter character timeout.
+  buffer_pos = 0;           // start the command string at zero length.
 
 }
 
@@ -65,7 +64,11 @@ void setup() {
  * SPINNNYYY
  */
 void loop() {
-  
+
+//  char audio_input;
+//  audio_input = '00001';
+//  parse_menu(audio_input);
+
   update_state();
   
   //play_state_audio();
@@ -73,21 +76,30 @@ void loop() {
   delay(100);
 }
 
+//------------------------------------------------------------------------------
+
 void update_state() {
 
+  curr_audio_state = 1;
+
+  /* TO-DO: uncomment after Liani is done testing
   // Digital signals sent from primary arduino, which will be treated as 3 bit binary number
   audio_state_read_1 = digitalRead(AUDIO_STATE_READ_PIN_1); // first digit of binary value:  000X
   audio_state_read_2 = digitalRead(AUDIO_STATE_READ_PIN_2); // second digit of binary value: 00X0
   audio_state_read_4 = digitalRead(AUDIO_STATE_READ_PIN_4); // third digit of binary value:  0X00
+  */
   
   // Read digital values like a binary number
   prev_audio_state = curr_audio_state;
-  curr_audio_state = (audio_state_read_4 * 4) + (audio_state_read_2 * 2) + (audio_state_read_1 * 1);
+  // curr_audio_state = (audio_state_read_4 * 4) + (audio_state_read_2 * 2) + (audio_state_read_1 * 1);
+  // TO-DO: uncomment above line after Liani is done testing
   
-  Serial.print("Estimated state: ");
-  Serial.println(curr_audio_state);
-  
-  Serial.println("");
+//  Serial.print("Estimated state: ");
+//  Serial.println(curr_audio_state);
+//  Serial.println("");
+
+  play_state_audio();
+
 }
 
 
@@ -110,12 +122,16 @@ void play_state_audio() {
   char audio_index;
   int track_val;
 
+  Serial.print("Estimated state: ");
+  Serial.println(curr_audio_state);
+  Serial.println("");
+
   // Convert state to appropriate audio index.
   if (curr_audio_state != prev_audio_state) {
     Serial.println("New audio state!");
     switch (curr_audio_state) {
       case 1: // calling the elevator
-        audio_index = '00002';
+        audio_index = "00002";
         break;
       case 2: // entering the elevator
         audio_index = '00003';
@@ -140,7 +156,10 @@ void play_state_audio() {
     }
   }
 
+  Serial.println("HELLO");
+  Serial.println(audio_index);
   parse_menu(audio_index);    // Send audio_index to parse_menu() to play appropriate track.
+  Serial.println("");
 
   delay(100);
   
