@@ -297,12 +297,6 @@ void FSM::call_elevator() {
  * Provide HRI around entering elevator.
  */
 void FSM::enter_elevator() {
-
-    ROS_INFO("Entering elevator");
-
-    // Wait for passengers to fully exit elevator
-    sleep(3);
-
     // Publish m_state to allow Sound Arduino to do its thang
     std_msgs::Int8 tmp = std_msgs::Int8();
     tmp.data = 2;
@@ -328,7 +322,9 @@ void FSM::enter_elevator() {
             ROS_INFO("Drive forward");
             m_cmd_vel.linear.x = 0.1;
             cmd_vel_pub.publish(m_cmd_vel);
-            sleep(1.0);
+
+            ros::Duration(1.0).sleep();
+
             m_cmd_vel.linear.x = 0.0;
             cmd_vel_pub.publish(m_cmd_vel);
             m_motion_status++;
@@ -351,7 +347,7 @@ void FSM::enter_elevator() {
             }
             break;
         case 3: 
-            ROS_INFO("Drive into elevator")
+            ROS_INFO("Drive into elevator");
             // Stop once set dist from elevator’s back wall
             ROS_INFO("Forward scan: %f", m_scan.at(256));
             //if (m_scan.at(256) < 1) {
@@ -367,13 +363,12 @@ void FSM::enter_elevator() {
             m_state = turning;
             break;
         case 5:
-            ROS_INFO("Finished entering");
+            ROS_INFO("Finished entering elevator");
             m_motion_status = 0;
             m_state = riding_elevator;
             break;
         default:
             break;
-
     }
 }
 
@@ -589,6 +584,8 @@ int main(int argc, char **argv) {
             &mission_controller);
 
     while (ros::ok()) {
+
+        ROS_INFO();
 
         // FSM decision tree
         switch(mission_controller.m_state) {
