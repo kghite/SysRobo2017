@@ -1,0 +1,29 @@
+start_map: Floor_Basement
+maps:
+     - name: Floor_Basement
+       north_angle: 0.0
+     - name: Floor_1
+       north_angle: 0.0
+     - name: Floor_2
+       north_angle: 0.0
+
+wormholes:
+     - name: elevator1 # for Gazebo simulation, this should be same as the spawn model name
+       type: elevator_blast
+       radius: 0.2
+       locations:
+            - map: Floor_Basement 
+              position: [9.475, 16.346] # dump coordinates
+              waiting_point: [14.382 16.130 3.132] # x, y, yaw 
+              floor: 0 
+              height: 0.0 # not used, but might be useful in the future to calculate the cost of using the elevator
+            - map: Floor_1
+              position: [9.475, 16.346]
+              waiting_point: [4.687 16.517 3.135]
+              floor: 1
+              height: 2.0
+            - map: Floor_2
+              position: [9.475, 16.346]
+              waiting_point: [4.687 16.517 3.135]
+              floor: 2
+              height: 4.0

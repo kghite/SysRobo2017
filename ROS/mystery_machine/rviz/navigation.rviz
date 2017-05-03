@@ -5,7 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded:
         - /Global Options1
-        - /Path1
+        - /Map2
       Splitter Ratio: 0.5
     Tree Height: 419
   - Class: rviz/Selection
@@ -157,13 +157,22 @@ Visualization Manager:
       Radius: 0.03
       Shaft Diameter: 0.1
       Shaft Length: 0.1
-      Topic: ""
+      Topic: /move_base/TrajectoryPlannerROS/global_plan
+      Unreliable: false
+      Value: true
+    - Alpha: 0.7
+      Class: rviz/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: true
+      Name: Map
+      Topic: /move_base/global_costmap/costmap
       Unreliable: false
       Value: true
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: map
+    Fixed Frame: odom
     Frame Rate: 30
   Name: root
   Tools:
@@ -184,7 +193,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 15.583
+      Distance: 19.4062
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
         Stereo Focal Distance: 1
@@ -196,10 +205,10 @@ Visualization Manager:
         Z: 0
       Name: Current View
       Near Clip Distance: 0.01
-      Pitch: 0.984797
+      Pitch: 0.694797
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 1.08721
+      Yaw: 0.562211
     Saved: ~
 Window Geometry:
   Camera Stream:
@@ -219,5 +228,5 @@ Window Geometry:
   Views:
     collapsed: true
   Width: 767
-  X: 802
+  X: 822
   Y: 14

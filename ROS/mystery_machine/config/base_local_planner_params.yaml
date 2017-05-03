@@ -1,13 +1,38 @@
 TrajectoryPlannerROS:
-  max_vel_x: 0.07
-  min_vel_x: 0.06
-  max_vel_theta: 0.1
-  min_in_place_vel_theta: 0.09
+    holonomic_robot: false
 
-  acc_lim_theta: 0.01
-  acc_lim_x: 0.01
-  acc_lim_y: 0.01
+    controller_frequency: 10
 
-  holonomic_robot: false
+    # setup limits
+    max_vel_x : 0.03
+    min_vel_x : 0.01
 
-  sim_time: 1.5
+    escape_vel: -0.1 # backing up
+
+    max_vel_y : 0.0
+    min_vel_y : 0.0
+
+    max_vel_theta : 0.03
+    max_vel_theta : 0.01
+    
+    max_in_place_vel_theta: 0.03
+    min_in_place_vel_theta: 0.01
+
+    acc_lim_x : 0.01
+    acc_lim_theta : 0.01
+    acc_lim_y : 0.0
+
+    yaw_goal_tolernace: 0.1
+    xy_goal_tolerance: 0.1
+
+    vtheta_samples: 20
+    vx_samples: 20
+
+    sim_time: 1.5
+    sim_granularity: 0.025
+    angular_sim_granularity: 0.025
+
+    sim_period: 0.1
+    use_dwa: false
+
+    prune_plan: false

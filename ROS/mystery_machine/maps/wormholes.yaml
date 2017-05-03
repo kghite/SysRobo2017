@@ -1,0 +1,25 @@
+start_map: floor_1
+maps:
+     - name: floor_1
+       north_angle: 0.0
+     - name: elevator_l
+       north_angle: 0.0
+     - name: elevator_r
+       north_angle: 0.0 
+wormholes:
+     - name: elevator_left_1
+       type: normal
+       radius: 0.5
+       locations:
+            - map: floor_1
+              position: [-8.664, 18.973]
+            - map: elevator_l
+              position: [-13.029, 18.369]
+     - name: elevator_right_1
+       type: normal
+       radius: 0.5
+       locations:
+            - map: floor_1
+              position: [-7.758, 17.487]
+            - map: elevator_r
+              position: [-11.709, 17.266]
