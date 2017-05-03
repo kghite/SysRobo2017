@@ -14,11 +14,12 @@ SdFat sd;
 SFEMP3Shield MP3player;
 int16_t last_ms_char;
 int8_t buffer_pos;
+uint8_t const SS_PIN = 9;
 
 // Reading audio state from digital pins
-const int AUDIO_STATE_READ_PIN_1 = 5;
-const int AUDIO_STATE_READ_PIN_2 = 12;
-const int AUDIO_STATE_READ_PIN_4 = 11;
+const int AUDIO_STATE_READ_PIN_1 = A0;
+const int AUDIO_STATE_READ_PIN_2 = A1;
+const int AUDIO_STATE_READ_PIN_4 = A2;
 uint8_t audio_state_read_1 = 0;
 uint8_t audio_state_read_2 = 0;
 uint8_t audio_state_read_4 = 0;
@@ -45,6 +46,8 @@ void setup() {
 
   Serial.begin(115200);
 
+  pinMode(9, OUTPUT);
+
   pinMode(AUDIO_STATE_READ_PIN_1, INPUT);
   pinMode(AUDIO_STATE_READ_PIN_2, INPUT);
   pinMode(AUDIO_STATE_READ_PIN_4, INPUT);
@@ -66,10 +69,7 @@ void setup() {
 void loop() {
 
   update_state();
-  
-  delay(3000);
-  //delay(100);
-  // TO-DO: Switch delay back to 100ms when running concurrently with analog input.
+  delay(100);
 }
 
 //------------------------------------------------------------------------------
@@ -80,7 +80,7 @@ void loop() {
  * -----    -----------    ----------
  * 0        4              Never Gonna Give You Up
  * 0        5              jazzy elev music
- * 0        6              Scooby the me song
+ * 0        6              Scooby theme song
  * 1        1              "hello. can you pls call elev for me?"
  * 2        2              "entering elev. pls stand clear."
  * 3        3              "exiting elev. pls stand clear."
@@ -88,27 +88,26 @@ void loop() {
 
 void update_state() {
 
-  /* TO-DO: uncomment after Liani is done testing
   // Digital signals sent from primary arduino, which will be treated as 3 bit binary number
   audio_state_read_1 = digitalRead(AUDIO_STATE_READ_PIN_1); // first digit of binary value:  000X
   audio_state_read_2 = digitalRead(AUDIO_STATE_READ_PIN_2); // second digit of binary value: 00X0
   audio_state_read_4 = digitalRead(AUDIO_STATE_READ_PIN_4); // third digit of binary value:  0X00
-  */
   
   // Read digital values like a binary number
   prev_audio_state = curr_audio_state;
-  // curr_audio_state = (audio_state_read_4 * 4) + (audio_state_read_2 * 2) + (audio_state_read_1 * 1);
-  // TO-DO: uncomment above line after Liani is done testing
+  curr_audio_state = (audio_state_read_4 * 4) + (audio_state_read_2 * 2) + (audio_state_read_1 * 1);
 
-  curr_audio_state = random(0,4);
+  // curr_audio_state = random(0,4);
   Serial.print("State: ");
-  Serial.print(curr_audio_state);
+  Serial.println(curr_audio_state);
   if (curr_audio_state == 0) Serial.println(" music");
   else if (curr_audio_state == 1) Serial.println(" calling");
   else if (curr_audio_state == 2) Serial.println(" entering");
   else if (curr_audio_state == 3) Serial.println(" exiting");
-  
-  play_state_audio();
+
+  if (curr_audio_state != prev_audio_state) {
+    play_state_audio();
+  }
 
 }
 
