@@ -65,22 +65,30 @@ void setup() {
  */
 void loop() {
 
-//  char audio_input;
-//  audio_input = '00001';
-//  parse_menu(audio_input);
-
   update_state();
-  
-  //play_state_audio();
-  
+    
   delay(100);
 }
 
 //------------------------------------------------------------------------------
+/*
+ * Maps analog in to a particular state.
+ *
+ * State    Audio Index    Audio Clip
+ * -----    -----------    ----------
+ * 0        4              Never Gonna Give You Up
+ * 0        5              jazzy elev music
+ * 0        6              Scooby the me song
+ * 1        1              "hello. can you pls call elev for me?"
+ * 2        2              "entering elev. pls stand clear."
+ * 3        3              "exiting elev. pls stand clear."
+
+
+*/
 
 void update_state() {
 
-  curr_audio_state = 1;
+  curr_audio_state = 0;
 
   /* TO-DO: uncomment after Liani is done testing
   // Digital signals sent from primary arduino, which will be treated as 3 bit binary number
@@ -94,10 +102,6 @@ void update_state() {
   // curr_audio_state = (audio_state_read_4 * 4) + (audio_state_read_2 * 2) + (audio_state_read_1 * 1);
   // TO-DO: uncomment above line after Liani is done testing
   
-//  Serial.print("Estimated state: ");
-//  Serial.println(curr_audio_state);
-//  Serial.println("");
-
   play_state_audio();
 
 }
@@ -105,17 +109,7 @@ void update_state() {
 
 //------------------------------------------------------------------------------
 /*
- * Bot state subscriber callback: Mapping the robot's state to the appropriate 
- * audio clip.
- * 
- * Index    Filename        State(str)     Action                   Audio Clip
- * -----    --------        ---------      ---------                ----------
- * 00001    TRACK004.mp3    0: within      playing elev music       Never Gonna Give You Up
- * 00002    TRACK001.mp3    1: asking      requesting aid @ elev    "Hello. Can you pls call elev for me?"
- * 00003    TRACK002.mp3    2: entering    entering elev            "Entering elevator; pls stand clear."
- * 00004    TRACK003.mp3    3: exiting     exiting elev             "Exiting elevator; pls stand clear."
- * 00005    TRACK005.mp3    0: within      playing elev music       generic elevator music
- * 00006    TRACK006.mp3    0: within      playing elev music       Scooby Doo theme song
+ * TO-DO: Docstring needed.
  */
 void play_state_audio() {
 
@@ -124,39 +118,68 @@ void play_state_audio() {
 
   Serial.print("Estimated state: ");
   Serial.println(curr_audio_state);
-  Serial.println("");
+//  Serial.println("");
 
   // Convert state to appropriate audio index.
   if (curr_audio_state != prev_audio_state) {
     Serial.println("New audio state!");
-    switch (curr_audio_state) {
-      case 1: // calling the elevator
-        audio_index = "00002";
-        break;
-      case 2: // entering the elevator
-        audio_index = '00003';
-        break;
-      case 3: // exiting the elevator
-        audio_index = '00004';
-        break;
-      case 0: // inside the elevator
-        track_val = random(0,2);
-        switch (track_val) {
-          case 0:
-            audio_index = '00001';
-            break;
-          case 1:
-            audio_index = '00005';
-            break;
-          case 2:
-            audio_index = '00006';
-            break;
-        }
-        break;
-    }
   }
+    
+  switch (curr_audio_state) {
+    case 1: // calling the elevator
+      audio_index = '00001';
+      break;
+    case 2: // entering the elevator
+      audio_index = '00002';
+      break;
+    case 3: // exiting the elevator
+      audio_index = '00003';
+      break;
+    case 0: // inside the elevator
+      track_val = random(0,2);
+      switch (track_val) {
+        case 0:
+          audio_index = '00004';
+          break;
+        case 1:
+          audio_index = '00005';
+          break;
+        case 2:
+          audio_index = '00006';
+          break;
+      }
+      break;
+  }    
+    
+//    switch (curr_audio_state) {
+//      case 1: // calling the elevator
+//        audio_index = '00002';
+//        break;
+//      case 2: // entering the elevator
+//        audio_index = '00003';
+//        break;
+//      case 3: // exiting the elevator
+//        audio_index = '00004';
+//        break;
+//      case 0: // inside the elevator
+//        track_val = random(0,2);
+//        switch (track_val) {
+//          case 0:
+//            audio_index = '00001';
+//            break;
+//          case 1:
+//            audio_index = '00005';
+//            break;
+//          case 2:
+//            audio_index = '00006';
+//            break;
+//        }
+//        break;
+//    }
+
 
   Serial.println("HELLO");
+  Serial.print("Audio index: ");
   Serial.println(audio_index);
   parse_menu(audio_index);    // Send audio_index to parse_menu() to play appropriate track.
   Serial.println("");
