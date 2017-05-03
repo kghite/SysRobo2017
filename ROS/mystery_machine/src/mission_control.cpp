@@ -48,7 +48,7 @@ enum State {
     exiting_elevator,
     matching_map,
     stopping,
-    testing
+    turning
 };
 
 
@@ -75,7 +75,9 @@ class FSM {
 
     public:  
         State m_state;
+        State m_prev_state;
         float m_elev_vel;   // velocity parameter
+        int m_motion_status; // Motion sequence control
 
         std::vector <float> m_scan;
 
@@ -112,7 +114,7 @@ class FSM {
         void enter_elevator();
         void ride_elevator();
         void stop();
-        void test();
+        void turn_pid();
         FloorSet exit_elevator();
         Floor match_map();
 
@@ -142,6 +144,7 @@ class FSM {
         float m_sum_error = 0.0;
         float m_diff_error = 0.0;
         float m_ang_vel = 0.0;
+        float m_elevator_yaw = 0.78;
 };
 
 
@@ -149,8 +152,9 @@ class FSM {
 * This is equivalnt to the init() method in python.
 */
 FSM::FSM(ros::NodeHandle n) {
-    m_elev_vel = 0.07; // speed for moving around the elevator
+    m_elev_vel = 0.09; // speed for moving around the elevator
     m_scan = std::vector <float> (512, 0.0); // fill scan with zeros
+    m_motion_status = 0; // Init motion sequence counter
 
     // PID
     m_yaw_thresh = 0.05; // in radians
@@ -212,10 +216,19 @@ void FSM::boot() {
 
     ROS_INFO("Booting");
 
-    if (m_loops_to_spend_in_boot - m_loops_spent_in_boot <= 0) {
+    // Make sure we don't play sound from a previous session
+    std_msgs::Int8 tmp = std_msgs::Int8();
+    tmp.data = 4;
+    audio_cmd_pub.publish(tmp);
 
-        m_goal_yaw = m_curr_yaw + 1.57;
-        m_state = testing;
+    if (m_loops_to_spend_in_boot - m_loops_spent_in_boot <= 0) {
+        // Test PID control
+        // m_goal_yaw = m_curr_yaw - 1.57;
+        // m_prev_state = stopping;
+        // m_state = turning;
+
+        // Start at elevator interaction
+        m_state = calling_elevator;
     }
     else {
 
@@ -290,38 +303,78 @@ void FSM::enter_elevator() {
     // Wait for passengers to fully exit elevator
     sleep(3);
 
-    // Publish m_state to allow Sound Arduino to do it's thang
+    // Publish m_state to allow Sound Arduino to do its thang
     std_msgs::Int8 tmp = std_msgs::Int8();
     tmp.data = 2;
     audio_cmd_pub.publish(tmp);
 
-    // Enter elevator slowly
-    // TODO: how to set wpt to elevator???  @Katie
-    // TODO: confirm this velocity
-    m_cmd_vel.linear.x = m_elev_vel;
-    cmd_vel_pub.publish(m_cmd_vel);
+    switch(m_motion_status) {
+        case 0:
+            ROS_INFO("Turn to elevator");
+            // Turn toward the open door
+            if (m_right_elev_open) {
+                // Set the door back to closed for riding
+                m_goal_yaw = m_curr_yaw + m_elevator_yaw;
+                m_prev_state = m_state;
+                m_state = turning;
+            }
+            else if (m_left_elev_open) {
+                m_goal_yaw = m_curr_yaw - m_elevator_yaw;
+                m_prev_state = m_state;
+                m_state = turning;
+            }
+            break;
+        case 1:
+            ROS_INFO("Drive forward");
+            m_cmd_vel.linear.x = 0.1;
+            cmd_vel_pub.publish(m_cmd_vel);
+            sleep(1.0);
+            m_cmd_vel.linear.x = 0.0;
+            cmd_vel_pub.publish(m_cmd_vel);
+            m_motion_status++;
+            break;
+        case 2: 
+            ROS_INFO("Turn sqaure");
+            // Turn back sqaure
+            if (m_right_elev_open) {
+                // Set the door back to closed for riding
+                m_right_elev_open = 0;
+                m_goal_yaw = m_curr_yaw - m_elevator_yaw;
+                m_prev_state = m_state;
+                m_state = turning;
+            }
+            else if (m_left_elev_open) {
+                m_left_elev_open = 0;
+                m_goal_yaw = m_curr_yaw + m_elevator_yaw;
+                m_prev_state = m_state;
+                m_state = turning;
+            }
+            break;
+        case 3: 
+            ROS_INFO("Drive into elevator")
+            // Stop once set dist from elevator’s back wall
+            ROS_INFO("Forward scan: %f", m_scan.at(256));
+            //if (m_scan.at(256) < 1) {
+            // stop moving forward when we are < 1m from elevator's back wall
+            m_motion_status++;
+            break;
 
-    sleep(1);
+        case 4:
+            ROS_INFO("Turn around");
+            // rotate bot 180 to face the door
+            m_goal_yaw = m_curr_yaw + 3.14;
+            m_prev_state = m_state;
+            m_state = turning;
+            break;
+        case 5:
+            ROS_INFO("Finished entering");
+            m_motion_status = 0;
+            m_state = riding_elevator;
+            break;
+        default:
+            break;
 
-    // Once 1m from elevator’s back wall: stop and rotate 180 to face elevator doors
-    ROS_INFO("Forward scan: %f", m_scan.at(256));
-    //if (m_scan.at(256) < 1) {
-        // stop moving forward when we are < 1m from elevator's back wall
-        m_cmd_vel.linear.x = 0;
-        cmd_vel_pub.publish(m_cmd_vel);
-
-        // rotate bot
-        m_cmd_vel.angular.z = FSM::m_elev_vel;   // TODO: confirm this velocity
-        cmd_vel_pub.publish(m_cmd_vel);
-
-        // stop rotating once we've gone 180
-        if (m_ang_traveled == M_PI or m_ang_traveled == -M_PI) {
-         m_cmd_vel.angular.z = 0;
-         cmd_vel_pub.publish(m_cmd_vel);
-        }
-
-    //}
-
+    }
 }
 
 
@@ -332,12 +385,10 @@ void FSM::ride_elevator() {
     // Publish m_state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = m_state;
-    tmp.data = 3;
+    tmp.data = 0;
     audio_cmd_pub.publish(tmp);
 
-    //if (FSM::scan_changes == 0) {
-        //FSM::m_state = exiting_elevator;
-    //}
+    // Check for the doors opening
 }
 
 /*
@@ -354,11 +405,12 @@ void FSM::stop() {
 
 
 /*
- * A development method used for testing.
+ * Turn the robot to m_goal_yaw
+ * Return to the previous state when finished
  */
-void FSM::test() {
+void FSM::turn_pid() {
 
-    ROS_INFO("Turning 90 degrees.");
+    ROS_INFO("Turning");
 
     // Publish m_state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
@@ -369,6 +421,12 @@ void FSM::test() {
     if (abs(m_goal_yaw - m_curr_yaw) > m_yaw_thresh) {
 
         m_curr_error = m_goal_yaw - m_curr_yaw;
+        if (m_curr_error > 3.14) {
+            m_curr_error = -3.14;
+        }
+        else if (m_curr_error < -3.14) {
+            m_curr_error = 3.14;
+        }
         m_sum_error += m_curr_error;
         m_diff_error = m_curr_error - m_prev_error;
 
@@ -394,7 +452,23 @@ void FSM::test() {
     // Close enough to turn goal. Stop robot.
     else {
 
-        m_state = stopping;
+        ROS_INFO("Reached goal angle.");
+
+        // Stop
+        m_cmd_vel.linear.x = 0.0;
+        m_cmd_vel.angular.z = 0.0;
+        cmd_vel_pub.publish(m_cmd_vel);
+
+        // Reset PID control
+        m_curr_error = 0.0;
+        m_prev_error = 0.0;
+        m_sum_error = 0.0;
+        m_diff_error = 0.0;
+        m_ang_vel = 0.0;
+
+        // Increment motion control and got back to prev state
+        m_motion_status++;
+        m_state = m_prev_state;
     }
 }
 
@@ -409,7 +483,7 @@ FloorSet FSM::exit_elevator() {
 
     // Publish m_state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
-    tmp.data = 4;
+    tmp.data = 3;
     audio_cmd_pub.publish(tmp);
 
     // Exit elevator by moving forward slowly
@@ -458,6 +532,8 @@ void FSM::odom_callback(const nav_msgs::Odometry odom) {
 
     // Get yaw angle
     m_curr_yaw = (float)tf::getYaw(m_curr_quat);
+    
+    //ROS_INFO("Yaw: %f\n", m_curr_yaw);
     //float prev_yaw = (float)tf::getYaw(m_quat_old);
 
     //// calculate distance traveled
@@ -549,8 +625,8 @@ int main(int argc, char **argv) {
                 mission_controller.stop();
                 break;
 
-            case testing:
-                mission_controller.test();
+            case turning:
+                mission_controller.turn_pid();
                 break;
 
             default:

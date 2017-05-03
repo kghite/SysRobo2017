@@ -20,7 +20,7 @@
 
     <!-- Lidar -->
     <arg name="boot_lidar" default="1" />
-    <arg name="lidar_port" default="/dev/ttyACM2" />
+    <arg name="lidar_port" default="/dev/ttyACM1" />
     <group if="$(arg boot_lidar)">
         <node pkg="hokuyo_node" type="hokuyo_node" name="hokuyo_node">
             <param name="port" value="$(arg lidar_port)" />
