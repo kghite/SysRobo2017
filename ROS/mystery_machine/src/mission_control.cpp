@@ -390,7 +390,6 @@ void FSM::ride_elevator() {
  * Stop the robot.
  */
 void FSM::stop() {
-
     ROS_INFO("Stopping.");
 
     m_cmd_vel.linear.x = 0.0;
@@ -584,8 +583,6 @@ int main(int argc, char **argv) {
             &mission_controller);
 
     while (ros::ok()) {
-
-        ROS_INFO();
 
         // FSM decision tree
         switch(mission_controller.m_state) {
