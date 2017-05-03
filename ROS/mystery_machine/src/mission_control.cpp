@@ -148,12 +148,7 @@ class FSM {
 
         // FSM::ride_elevator
         float m_closed_mid_elev_scan_avg = 0.0;
-        float m_elev_open_thresh = 0.2;
         uint8_t m_mid_elev_open = 0;
-        int8_t m_curr_pace_dir = -1;
-
-        // FSM::exit_elevator
-
 };
 
 
@@ -412,10 +407,10 @@ void FSM::ride_elevator() {
     // closed has not been defined, then define it
     if (m_closed_mid_elev_scan_avg == 0.0) {
 
-        m_closed_mid_elev_scan_avg = avg_left_elev_scan;
+        m_closed_mid_elev_scan_avg = avg_mid_elev_scan;
     }
 
-    // If the left elevator door opened
+    // If the elevator door opened
     if (avg_mid_elev_scan - m_closed_mid_elev_scan_avg >=
             m_elev_open_thresh) {
 
