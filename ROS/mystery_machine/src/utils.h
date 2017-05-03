@@ -12,10 +12,12 @@
  */
 float avg(std::vector <float> vec) {
 
+    // Initialize averaging variables
+    int num_elements = vec.size();
     float total = 0.0;
     float average = 0.0;
-    int num_elements = vec.size();
 
+    // Sum all values in the vector
     for (int i=0; i<num_elements; i++) {
         float curr_val = vec.at(i);
 
@@ -23,7 +25,9 @@ float avg(std::vector <float> vec) {
         if (isfinite(curr_val)) {
             total += curr_val;
         }
-}
+    }
+
+    // Normalize the total to get the average
     average = total / num_elements;
  
     return average;
