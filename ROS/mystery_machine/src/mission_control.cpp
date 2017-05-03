@@ -7,13 +7,13 @@
  * exploration with the Mystery Machine  
 */
 
+
 #include "string"
 #include "list"
 #include "iostream"
 #include "math.h"
 
 #include "ros/ros.h"
-
 #include "geometry_msgs/Pose.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Twist.h"
@@ -27,11 +27,11 @@
 #include <move_base_msgs/MoveBaseAction.h>
 #include <actionlib/client/simple_action_client.h>
 
-// Nav stack simple goals interface
-typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
-move_base_msgs::MoveBaseGoal goal;
 
-int lastRock;
+// Nav stack simple goals interface
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>
+        MoveBaseClient;
+move_base_msgs::MoveBaseGoal goal;
 
 // Set up state values
 enum State {
@@ -59,9 +59,8 @@ struct FloorSet {
     float probs[];
 };
 
-
 // declaring publishers
-ros::Publisher audio_pub;
+ros::Publisher audio_cmd_pub;
 ros::Publisher cmd_vel_pub;
 
 
@@ -70,11 +69,21 @@ class FSM {
     public:  
         State state;
         float elev_vel;   // velocity parameter
+        bool scan_changes;
+        // Direction to pace while calling elevator
+        uint8_t calling_elev_pace_dir = 1;
 
         // declaring scanResponse info
-        bool scan_changes;   // 0 = no change; 1 = changed
+        bool scan_changes_left; // 0 = no changes from old; 
+                                // 1 = there are changes from old
+        bool scan_changes_right;
+
         std::vector<float> scan_old;
+        std::vector<float> scan_old_left;
+        std::vector<float> scan_old_right;
         std::vector<float> scan_new;
+        std::vector<float> scan_new_left;
+        std::vector<float> scan_new_right;
 
         // declaring odomResponse info
         float dist_traveled;
@@ -94,7 +103,6 @@ class FSM {
         // nav_msgs::Odometry odom;
         sensor_msgs::LaserScan scan;
         std_msgs::Int8 floor;
-
 
         // declaring methods
         float explore_floor();
@@ -175,24 +183,16 @@ FloorSet FSM::order_maps(std::string map_store_file,
  */
 void FSM::call_elevator() {
 
-
     // Publish audio state
     std_msgs::Int8 tmp = std_msgs::Int8();
     tmp.data = 1;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
-    // Rock back and forth
-	  goal.target_pose.header.frame_id = "base_link";
-	  goal.target_pose.header.stamp = ros::Time::now();
-
-	  if (lastRock == 0) {
-	  		goal.target_pose.pose.position.x = 0.1;
-	  		lastRock = 1;
-	  }
-	  else {
-	  		goal.target_pose.pose.position.x = -0.1;
-	  		lastRock = 0;
-	  }
+    // Make the robot pace back and forth
+    goal.target_pose.header.frame_id = "base_link";
+    goal.target_pose.header.stamp = ros::Time::now();
+    // Change direction and then set goal
+    goal.target_pose.pose.position.x = (calling_elev_pace_dir *= 1);
 }
 
 /* 
@@ -209,7 +209,7 @@ void FSM::enter_elevator() {
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = state;
     tmp.data = 2;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Enter elevator slowly
     // TODO: how to set wpt to elevator???  @Katie
@@ -247,7 +247,7 @@ void FSM::ride_elevator() {
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = state;
     tmp.data = 3;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     if (FSM::scan_changes == 0) {
         FSM::state = exiting_elevator;
@@ -266,7 +266,7 @@ FloorSet FSM::exit_elevator() {
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = state;
     tmp.data = 4;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Exit elevator by moving forward slowly
     // TODO: confirm this velocity
@@ -305,15 +305,29 @@ void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
     // set incoming data to object's scan_new attr
     FSM::scan_new = scan.ranges;
 
+    // TODO: 
+    // First, determine if 0-256 is actually left.  Or is it right?
+    // Second, make comparison more robust, i.e. not just a straight comparison
+    // between old and new (because tolerance in readings allows for slop)
+    std::vector<float> scan_new_left(FSM::scan_new.begin()+0,
+            FSM::scan_new.begin()+256);
+
+    std::vector<float> scan_new_right(FSM::scan_new.begin()+256,
+            FSM::scan_new.begin()+512);
+
+
     // compare to scan_old, setting bool scan_changes appropriately
-    if (FSM::scan_new == FSM::scan_old) {
-        FSM::scan_changes = 1;
-    } else {
-        FSM::scan_changes = 0;
-    }
+    // If there are no changes, bool = 0.  If changes, bool = 1.
+    if (scan_new_left == FSM::scan_old_left) FSM::scan_changes_left = 0;
+    else FSM::scan_changes_left = 1;
+
+    if (scan_new_right == FSM::scan_old_right) FSM::scan_changes_right = 0;
+    else FSM::scan_changes_right = 1;
 
     // set scan_new to scan_old
     FSM::scan_old = FSM::scan_new;
+    FSM::scan_old_left = scan_new_left;
+    FSM::scan_old_right = scan_old_right;
 }
 
 void FSM::odomResponse(const nav_msgs::Odometry odom) {
@@ -355,6 +369,7 @@ void FSM::odomResponse(const nav_msgs::Odometry odom) {
 
 
 int main(int argc, char **argv) {
+
     ros::init(argc, argv, "mission_control");
     ros::NodeHandle n;
     ros::Rate loop_rate(10);
@@ -367,21 +382,23 @@ int main(int argc, char **argv) {
     mission_controller.floor.data = 1;
 
     // Publishers
-    audio_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
+    audio_cmd_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
-	  // Subscribers
-    ros::Subscriber sub_scan = n.subscribe("/scan", 1000, &FSM::scanResponse, &mission_controller);
-    ros::Subscriber sub_odom = n.subscribe("/odom", 1000, &FSM::odomResponse, &mission_controller);
+    // Subscribers
+    ros::Subscriber sub_scan = n.subscribe("/scan", 1000, &FSM::scanResponse,
+            &mission_controller);
+    ros::Subscriber sub_odom = n.subscribe("/odom", 1000, &FSM::odomResponse,
+            &mission_controller);
 
-		MoveBaseClient ac("move_base", true);
+    MoveBaseClient ac("move_base", true);
 
-	  // Move base server
-	  while(!ac.waitForServer(ros::Duration(5.0))){
-	    ROS_INFO("Waiting for the move_base action server to come up");
-	  }
+    // Move base server
+    while(!ac.waitForServer(ros::Duration(5.0))) {
+        ROS_INFO("Waiting for the move_base action server to come up");
+    }
 
-	  int lastRock = 0;
+    int lastRock = 0;
 
     while (ros::ok()) {
 
@@ -432,14 +449,16 @@ int main(int argc, char **argv) {
         // }
 
         ROS_INFO("Sending goal");
-	  		ac.sendGoal(goal);
+        ac.sendGoal(goal);
 
-	  		ac.waitForResult();
+        ac.waitForResult();
 
-	  		if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-	    			ROS_INFO("Move succeeded");
-	  		else
-	    			ROS_INFO("Move failed");
+        if (ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            ROS_INFO("Move succeeded");
+        }
+        else {
+            ROS_INFO("Move failed");
+        }
 
         loop_rate.sleep();
         ros::spinOnce();
