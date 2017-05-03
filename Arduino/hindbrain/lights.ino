@@ -39,6 +39,9 @@ void setup_lights() {
   right_strip.setBrightness(16);
   left_ring.setBrightness(16);
   right_ring.setBrightness(16);
+  
+  // Define pin modes
+  pinMode(ESTOP_PIN, INPUT);
 }
 
 

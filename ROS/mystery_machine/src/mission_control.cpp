@@ -31,7 +31,8 @@
 
 
 // Nav stack simple goals interface
-typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>
+        MoveBaseClient;
 move_base_msgs::MoveBaseGoal goal;
 
 // Set up m_state values
@@ -62,9 +63,8 @@ struct FloorSet {
     float probs[];
 };
 
-
 // declaring publishers
-ros::Publisher audio_pub;
+ros::Publisher audio_cmd_pub;
 ros::Publisher cmd_vel_pub;
 
 
@@ -193,7 +193,7 @@ void FSM::call_elevator() {
     // Publish appropriate audio m_state
     std_msgs::Int8 tmp = std_msgs::Int8();
     tmp.data = 1;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Split current LaserScan into left and right sides
     std::vector<float> left_elev_scan(m_scan.begin()+256,
@@ -251,7 +251,7 @@ void FSM::enter_elevator() {
     // Publish m_state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
     tmp.data = 2;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Enter elevator slowly
     // TODO: how to set wpt to elevator???  @Katie
@@ -290,7 +290,7 @@ void FSM::ride_elevator() {
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = m_state;
     tmp.data = 3;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     //if (FSM::scan_changes == 0) {
         //FSM::m_state = exiting_elevator;
@@ -310,7 +310,7 @@ FloorSet FSM::exit_elevator() {
     std_msgs::Int8 tmp = std_msgs::Int8();
     // tmp.data = m_state;
     tmp.data = 4;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Exit elevator by moving forward slowly
     // TODO: confirm this velocity
@@ -403,7 +403,7 @@ int main(int argc, char **argv) {
     mission_controller.floor.data = 1;
 
     // Publishers
-    audio_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
+    audio_cmd_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
     // Subscribers

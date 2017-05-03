@@ -11,8 +11,16 @@ float sonar_reading;
 unsigned int sonar_point_id = 0;
 
 
+// ROS publisher
+mystery_machine::SonarScan sonar_data_msg;
+ros::Publisher sonar_data_publisher("sonar_data", &sonar_data_msg);
+
+
 // Setup process for sonar
 void setup_sonar() {
+  
+  // ROS publisher
+  nh.advertise(sonar_data_publisher);
   
   sonar_pan_servo.attach(SONAR_PAN_PIN);
 }
