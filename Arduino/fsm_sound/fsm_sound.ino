@@ -66,8 +66,10 @@ void setup() {
 void loop() {
 
   update_state();
-    
-  delay(100);
+  
+  delay(3000);
+  //delay(100);
+  // TO-DO: Switch delay back to 100ms when running concurrently with analog input.
 }
 
 //------------------------------------------------------------------------------
@@ -82,13 +84,9 @@ void loop() {
  * 1        1              "hello. can you pls call elev for me?"
  * 2        2              "entering elev. pls stand clear."
  * 3        3              "exiting elev. pls stand clear."
-
-
 */
 
 void update_state() {
-
-  curr_audio_state = 0;
 
   /* TO-DO: uncomment after Liani is done testing
   // Digital signals sent from primary arduino, which will be treated as 3 bit binary number
@@ -101,6 +99,14 @@ void update_state() {
   prev_audio_state = curr_audio_state;
   // curr_audio_state = (audio_state_read_4 * 4) + (audio_state_read_2 * 2) + (audio_state_read_1 * 1);
   // TO-DO: uncomment above line after Liani is done testing
+
+  curr_audio_state = random(0,4);
+  Serial.print("State: ");
+  Serial.print(curr_audio_state);
+  if (curr_audio_state == 0) Serial.println(" music");
+  else if (curr_audio_state == 1) Serial.println(" calling");
+  else if (curr_audio_state == 2) Serial.println(" entering");
+  else if (curr_audio_state == 3) Serial.println(" exiting");
   
   play_state_audio();
 
@@ -116,13 +122,10 @@ void play_state_audio() {
   char audio_index;
   int track_val;
 
-  Serial.print("Estimated state: ");
-  Serial.println(curr_audio_state);
-//  Serial.println("");
-
   // Convert state to appropriate audio index.
   if (curr_audio_state != prev_audio_state) {
     Serial.println("New audio state!");
+    parse_menu('s');
   }
     
   switch (curr_audio_state) {
@@ -136,7 +139,7 @@ void play_state_audio() {
       audio_index = '00003';
       break;
     case 0: // inside the elevator
-      track_val = random(0,2);
+      track_val = random(0,3);
       switch (track_val) {
         case 0:
           audio_index = '00004';
@@ -150,37 +153,10 @@ void play_state_audio() {
       }
       break;
   }    
-    
-//    switch (curr_audio_state) {
-//      case 1: // calling the elevator
-//        audio_index = '00002';
-//        break;
-//      case 2: // entering the elevator
-//        audio_index = '00003';
-//        break;
-//      case 3: // exiting the elevator
-//        audio_index = '00004';
-//        break;
-//      case 0: // inside the elevator
-//        track_val = random(0,2);
-//        switch (track_val) {
-//          case 0:
-//            audio_index = '00001';
-//            break;
-//          case 1:
-//            audio_index = '00005';
-//            break;
-//          case 2:
-//            audio_index = '00006';
-//            break;
-//        }
-//        break;
-//    }
 
-
-  Serial.println("HELLO");
   Serial.print("Audio index: ");
   Serial.println(audio_index);
+  
   parse_menu(audio_index);    // Send audio_index to parse_menu() to play appropriate track.
   Serial.println("");
 
