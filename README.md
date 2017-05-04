@@ -129,10 +129,7 @@ Open rviz with any of our custom configuration files to view results of the abov
 
 for example
 
-<<<<<<< HEAD
 `rviz -d rviz/mapping.rviz`
-=======
-`rosrun uvc_camera uvc_camera_node _device:=<CAMERA_PORT`
 
 ## The Team
 
@@ -142,4 +139,3 @@ We're the Scooby Gang! In real life, we're the team of five students at Olin who
 - [Liani Lye](https://github.com/lianilychee)
 - [Lauren Gulland](https://github.com/laurengulland)
 - [Arpan Rau](https://github.com/arpanrau)
->>>>>>> c1498a8c6c2cb15929b5e90e2a515b38035ed9f6
