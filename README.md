@@ -1,19 +1,25 @@
 # RoboSys2017
-Code base for the Mystery Machine autonomous race vehicle
+Code base for the Mystery Machine autonomous exploration vehicle
 
 
 ## Project Description
 
-The mystery machine autonomous race vehicle was created to autonomously navigate around the Olin Oval while avoiding static and dynamic obstacles.
+The Mystery Machine exploration vehicle was created to autonomously exlpore an unknown building by assembling maps of every floor in the building, and navigating through elevators to different floors. This was for the Integrated Robotic Systems class at Olin College of Engineering run by Drew Bennett and Dave Barrett in the spring of 2017. For this project, we built off of a previous robot base, which you can view the original code for [here](https://github.com/kghite/FunRobo2016).
+
+## Architecture
 
 #### Hardware Structure:
 
-The mystery machine runs using an Odroid connected to an Arduino Mega to control motors, lights, and small emergency stop sensors and a powered usb hub connecting a suite of sensors including a LIDAR, camera, gps, and IMU.
+The mystery machine runs using an Odroid connected to an Arduino Mega to control motors, lights, and small emergency stop sensors and a powered usb hub connecting a suite of sensors including a LIDAR, sonar,camera, gps, and IMU.
+
+For a more complete structuring of our electrical system, see the diagram below:
+![Electrical Diagram](https://github.com/kghite/SysRobo2017/blob/master/wiring_diagram.png)
 
 #### Software Structure:
 
-The software structure consists of three parts.  The hindbrain runs on the Arduino and controls immediate reaction to fast inputs such as perimeter sonar to allow emergency stopping before running into an unexpected obstacle and motor control.  Communicating with the Arduino using rosserial, the Odroid runs the ROS midbrain and forebrain.  The midbrain controls forward and backward motion, while the forebrain controls turning.  These values are sent over command velocity topics to a python arbiter script that chooses the most highly rated output command from the topics.  This is sent to the Arduino as the final velocity output.
+The software structure consists of two parts.  The hindbrain runs on the Arduino and controls immediate reaction to fast inputs, such as perimeter sonar sensors (to allow emergency stopping before running into an unexpected obstacle or down stairs) and motor control. Communicating with the Arduino using rosserial, the Odroid runs the ROS Finite State Machine. The FSM, which you can see laid out in the diagram below, determines which state the robot is in, manages the transitions between states, and calls whichever scripts should be running to execute that state's mission. Any movement of the robot is piloted by whichever state it is in, and is sent over command velocity topics to the Arduino as the velocity output.
 
+![Finite State Diagram](https://github.com/kghite/SysRobo2017/blob/master/finite_state_diagram_final.png)
 
 ## Our Scripts
 
