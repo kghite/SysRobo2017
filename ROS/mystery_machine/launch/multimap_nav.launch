@@ -1,0 +1,43 @@
+<launch>
+  <master auto="start"/>
+
+  <!-- Load Floor 1 Map   
+  <arg name="map_file" default="$(find mystery_machine)/maps/floor_1.yaml"/>
+  <node name="map_server" pkg="map_server" type="map_server" args="$(arg map_file)" /> -->
+
+
+  <!-- Navigation Stack -->
+  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+    <rosparam file="$(find mystery_machine)/config/costmap_common_params.yaml" command="load" ns="global_costmap" />
+    <rosparam file="$(find mystery_machine)/config/costmap_common_params.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find mystery_machine)/config/local_costmap_params.yaml" command="load" />
+    <rosparam file="$(find mystery_machine)/config/global_costmap_params.yaml" command="load" />
+    <rosparam file="$(find mystery_machine)/config/base_local_planner_params.yaml" command="load" />
+  </node>
+
+
+  <!-- Multimap Navigation -->
+  <include file="$(find multi_map_navigation)/launch/setup/map_store.launch">
+    <arg name="frame_id_ref" value="map"/>
+    <remap from="map" to="map_store_map"/>
+  </include>
+
+  <node pkg="multi_map_navigation" type="multi_map_navigation_manager.py" name="multi_map_navigation" output="screen">
+        <param name="definition_file" value="$(find mystery_machine)/maps/wormholes.yaml" />
+        <param name="transition_types" value="" />
+        <param name="base_frame" value="base_link"/>
+  </node>
+
+
+  <!-- Load localization within map -->
+  <node pkg="amcl" type="amcl" name="amcl">
+    <remap from="scan" to="base_scan"/>
+  </node>
+
+
+  <!-- Set initial robot pose -->
+  <param name="/amcl/initial_pose_x" value="9.116" />
+  <param name="/amcl/initial_pose_y" value="10.993" />
+  <param name="/amcl/initial_pose_a" value="1.546" />
+
+</launch>

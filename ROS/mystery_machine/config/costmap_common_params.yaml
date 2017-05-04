@@ -1,11 +1,22 @@
-obstacle_range: 5.6
-raytrace_range: 3.0
-#footprint: [[x0, y0], [x1, y1], ... [xn, yn]]
-robot_radius: .3
-inflation_radius: 1.0
+obstacle_range: 3.0
+min_obstacle_height: -0.1
+max_obstacle_height: 0.1
+raytrace_range: 5.5
+holonomic_robot: false
+footprint: [[0.4, 0.2], [0.4, -0.2], [-0.3,-0.2], [-0.3,0.2]]
 
-observation_sources: laser_scan_sensor #point_cloud_sensor is for sonar later, set laser clearing to false for this.
+map_type: costmap
+publish_frequency: 1.0
 
-laser_scan_sensor: {sensor_frame: laser, data_type: LaserScan, topic: /scan, marking: true, clearing: true}
+obstacle_layer:
+    observation_sources: scan
+    track_unknown_space: true
+    scan: {data_type: LaserScan, sensor_frame: /laser, topic: /scan, clearing: true, marking: true, expected_update_rate: 1.0}
 
-#point_cloud_sensor: {sensor_frame: frame_name, data_type: PointCloud, topic: topic_name, marking: true, clearing: true}
+inflation_layer:
+    enabled : True 
+    cost_scaling_factor: 5
+    inflation_radius: 0.01
+
+static_layer:
+    enabled: true
