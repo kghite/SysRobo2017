@@ -82,58 +82,38 @@ SSH into the IP address with port 22 open. It may take a while to see the open S
 
 `ssh odroid@<IP_ADDRESS_FOUND_WITH_NMAP>`
 
-#### Teleop Mode
+#### Startup the robot
 
-`roslaunch mystery_machine teleop.launch arduino_port:=<ARDUINO_PORT>`
+`roslaunch mystery_machine bringup.launch`
 
-#### Data-Logging Mode
+This command will start:
 
-`roslaunch mystery_machine data_log.launch arduino_port:=<ARDUINO_PORT> lidar_port:=<LIDAR_PORT> camera_port:=<CAMERA_PORT>`
+- Rosserial communication with the Arduino Mega
+- Lidar Hokuyo node
+- Transform for the lidar sensor
+- Transform for the sonar sensor
+- SonarTransform node that merges sonar and lidar scans
 
-#### Mapping Mode
+#### Teleoperation
 
-`roslaunch mystery_machine mapping.launch arduino_port:=<ARDUINO_PORT> lidar_port:=<LIDAR_PORT>`
+`rosrun teleop_twist_keyboard teleop_twist_keyboard.py`
 
+This will allow the user to control the robot's movement with keyboard input.
 
-## Individual Node and Sensor Documentation
+#### Mapping
 
-NOTE: To find the port names for terminal commands on another machine run `./ports.sh` in the `/scripts` folder.
+First run `bringup.launch` from earlier.
 
-#### Rosserial
+`roslaunch mystery_machine mapping.launch`
 
-If the Arduino is running, it will listen for `/cmd_vel`.
+Maps, with glass-detection included, will be automatically generated from the merged lidar and sonar scan.
 
-`rosrun rosserial_python serial_node.py <ARDUINO_PORT>`
+#### Visualization
 
-#### LIDAR
+Open rviz with any of our custom configuration files to view results of the above software.
 
-To initialize and visualize the LIDAR scans on `/scan` run:
+`rviz -d rviz/<CONFIG_FILE_NAME>`
 
-```
-sudo chmod a+rw <LIDAR_PORT>
-rosrun hokuyo_node hokuyo_node <LIDAR_PORT>
-rosrun rviz rviz
-```
+for example
 
-Add a LaserScan and set the topic to /scan.  Change fixed frame from map to laser.
-
-#### GPS
-
-To start the GPS feed on `/fix` run:
-
-```
-sudo chmod a+rw <GPS_PORT>
-rosrun nmea_navsat_driver nmea_serial_driver _port:=<GPS_PORT> _baud:=115200
-```
-
-#### IMU
-
-To start the imu feed run:
-
-`rosrun phidgets_imu phidgets_imu_node`
-
-#### Camera
-
-To start the camera feed run:
-
-`rosrun uvc_camera uvc_camera_node _device:=<CAMERA_PORT`
+`rviz -d rviz/mapping.rviz`
