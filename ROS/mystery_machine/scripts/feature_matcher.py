@@ -109,5 +109,5 @@ class Feature_Matcher():
             self.sleepy.sleep()
 
 feature = Feature_Matcher()
-feature.test=False #set me to true to get printing images for debugging!
+feature.test=True #set me to true to get printing images for debugging!
 feature.run()
