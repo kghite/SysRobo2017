@@ -29,7 +29,6 @@
 
 #include "utils.h"
 
-
 // Nav stack simple goals interface
 typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>
         MoveBaseClient;
