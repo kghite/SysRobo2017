@@ -17,7 +17,6 @@
 
 #include "utils.h"
 
-
 // declaring publishers
 ros::Publisher audio_cmd_pub;
 ros::Publisher cmd_vel_pub;
@@ -99,6 +98,10 @@ class FSM {
         float m_diff_error = 0.0;
         float m_ang_vel = 0.0;
         float m_elevator_yaw = 0.78;
+
+        // FSM::ride_elevator
+        float m_closed_mid_elev_scan_avg = 0.0;
+        uint8_t m_mid_elev_open = 0;
 };
 
 
@@ -223,7 +226,7 @@ void FSM::enter_elevator() {
             break;
         case 1:
             ROS_INFO("Drive forward");
-            m_cmd_vel.linear.x = 0.1;
+            m_cmd_vel.linear.x = m_elev_vel;
             cmd_vel_pub.publish(m_cmd_vel);
 
             ros::Duration(1.0).sleep();
@@ -252,12 +255,15 @@ void FSM::enter_elevator() {
         case 3: 
             ROS_INFO("Drive into elevator");
             // Stop once set dist from elevator’s back wall
+            m_cmd_vel.linear.x = m_elev_vel;
+            cmd_vel_pub.publish(m_cmd_vel);
             ROS_INFO("Forward scan: %f", m_scan.at(256));
-            //if (m_scan.at(256) < 1) {
-            // stop moving forward when we are < 1m from elevator's back wall
-            m_motion_status++;
+            if (m_scan.at(256) < 0.5) {
+                m_cmd_vel.linear.x = 0.0;
+                cmd_vel_pub.publish(m_cmd_vel);
+                m_motion_status++;
+            }
             break;
-
         case 4:
             ROS_INFO("Turn around");
             // rotate bot 180 to face the door
@@ -287,6 +293,67 @@ void FSM::ride_elevator() {
     audio_cmd_pub.publish(tmp);
 
     // Check for the doors opening
+
+    // Constrain lidar scan to front
+    std::vector<float> mid_elev_scan(m_scan.begin()+170,
+            m_scan.begin()+341);
+
+    // Find average distance on left and right sides of LaserScan
+    float avg_mid_elev_scan = avg(mid_elev_scan);
+
+    // Debug print statements
+    ROS_INFO("Closed elev scan avg: %f", m_closed_mid_elev_scan_avg);
+    ROS_INFO("Avg right elevator scan: %f", avg_mid_elev_scan);
+
+    // If a baseline for what the LaserScan looks like when the elevators are
+    // closed has not been defined, then define it
+    if (m_closed_mid_elev_scan_avg == 0.0) {
+
+        m_closed_mid_elev_scan_avg = avg_mid_elev_scan;
+    }
+
+    // If the elevator door opened
+    if (avg_mid_elev_scan - m_closed_mid_elev_scan_avg >=
+            m_elev_open_thresh) {
+
+        ROS_INFO("Door opened");
+        m_mid_elev_open = 1;
+        m_state = exiting_elevator;
+    }
+}
+
+
+ /*
+ * Provide HRI around exiting elevator.
+ *
+ * return: the list of possible floor IDs that the robot could be at on 
+ * elevator exit
+ */
+FloorSet FSM::exit_elevator() {
+
+    // Publish m_state to allow Sound Arduino to do it's thang
+    std_msgs::Int8 tmp = std_msgs::Int8();
+    tmp.data = 3;
+    audio_cmd_pub.publish(tmp);
+
+    // Exit elevator by moving forward slowly
+    m_cmd_vel.linear.x = m_elev_vel;
+    cmd_vel_pub.publish(m_cmd_vel);
+
+    ros::Duration(1.0).sleep();
+
+    m_cmd_vel.linear.x = 0;
+    cmd_vel_pub.publish(m_cmd_vel);
+    m_state = stopping;
+
+    // Once bot has exited elevator, stop
+    // float x_m_dist_traveled = abs(m_curr_pos.x - m_pos_old.x);
+
+    // if (x_m_dist_traveled > 1.5) {
+    //     m_cmd_vel.linear.x = 0;
+    //     cmd_vel_pub.publish(m_cmd_vel);
+    //     m_state = stopping;
+    // }
 }
 
 /*
@@ -380,7 +447,6 @@ void FSM::turn_pid() {
     }
 }
 
-
 /*
  * Testing state for development.
  */
@@ -405,25 +471,6 @@ void FSM::test() {
 }
 
 
- /*
- * Provide HRI around exiting elevator.
- *
- * return: the list of possible floor IDs that the robot could be at on 
- * elevator exit
- */
-void FSM::exit_elevator() {
-
-    // Publish m_state to allow Sound Arduino to do it's thang
-    std_msgs::Int8 tmp = std_msgs::Int8();
-    tmp.data = 3;
-    audio_cmd_pub.publish(tmp);
-
-    // Exit elevator by moving forward slowly
-    m_cmd_vel.linear.x = m_elev_vel;
-    cmd_vel_pub.publish(m_cmd_vel);
-}
-
-
 void FSM::scan_callback(const sensor_msgs::LaserScan msg) {
 
     m_scan = msg.ranges;
@@ -431,6 +478,10 @@ void FSM::scan_callback(const sensor_msgs::LaserScan msg) {
 
 
 void FSM::odom_callback(const nav_msgs::Odometry odom) {
+
+    // Set past postition
+    m_pos_old = m_curr_pos;
+    m_quat_old = m_curr_quat;
 
     // Define current position and orientation
     m_curr_pos = odom.pose.pose.position;
