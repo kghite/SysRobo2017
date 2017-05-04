@@ -28,23 +28,6 @@ Communicating with the Arduino using rosserial, the robot's Odroid runs the miss
 
 ![Finite State Diagram](https://github.com/kghite/SysRobo2017/blob/master/finite_state_diagram_final.png)
 
-## Our Scripts
-
-There is a scripts folder in the mystery_machine package that contains scripts to run the appropriate launch files and commands for different functionalities include teleop mode, sensor data logging, navigation, etc. 
-
-Current Functional Scripts:
-
-- ports.sh - List all of the sensor port names to edit the launch files
-- telop_mode.sh - Run the robot with the following key layout:
-
-```
-	I
-J	K 	L
-	,
-```
-
-The following sections also detail running individual packages or sensor feeds from terminal.
-
 
 ## Setup
 
@@ -130,6 +113,7 @@ Open rviz with any of our custom configuration files to view results of the abov
 for example
 
 `rviz -d rviz/mapping.rviz`
+
 
 ## The Team
 
