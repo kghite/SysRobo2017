@@ -109,7 +109,7 @@ class FSM {
 * This is equivalnt to the init() method in python.
 */
 FSM::FSM(ros::NodeHandle n) {
-    m_elev_vel = 0.1; // speed for moving around the elevator
+    m_elev_vel = 0.09; // speed for moving around the elevator
     m_scan = std::vector <float> (512, 0.0); // fill scan with zeros
     m_motion_status = 0; // Init motion sequence counter
 }
@@ -127,12 +127,12 @@ void FSM::boot() {
     if (m_loops_to_spend_in_boot - m_loops_spent_in_boot <= 0) {
 
         // Test PID control
-        m_goal_yaw = m_curr_yaw - 1.57;
-        m_prev_state = stopping;
-        m_state = turning;
+        // m_goal_yaw = m_curr_yaw - 3.14;
+        // m_prev_state = stopping;
+        // m_state = turning;
 
         // Start at elevator interaction
-        //m_state = calling_elevator;
+        m_state = calling_elevator;
 
         //m_state = testing;
     }
@@ -214,12 +214,12 @@ void FSM::enter_elevator() {
             // Turn toward the open door
             if (m_right_elev_open) {
                 // Set the door back to closed for riding
-                m_goal_yaw = m_curr_yaw + m_elevator_yaw;
+                m_goal_yaw = wrap_radians(m_curr_yaw + m_elevator_yaw);
                 m_prev_state = m_state;
                 m_state = turning;
             }
             else if (m_left_elev_open) {
-                m_goal_yaw = m_curr_yaw - m_elevator_yaw;
+                m_goal_yaw = wrap_radians(m_curr_yaw - m_elevator_yaw);
                 m_prev_state = m_state;
                 m_state = turning;
             }
@@ -229,7 +229,7 @@ void FSM::enter_elevator() {
             m_cmd_vel.linear.x = m_elev_vel;
             cmd_vel_pub.publish(m_cmd_vel);
 
-            ros::Duration(1.0).sleep();
+            ros::Duration(1.5).sleep();
 
             m_cmd_vel.linear.x = 0.0;
             cmd_vel_pub.publish(m_cmd_vel);
@@ -241,13 +241,13 @@ void FSM::enter_elevator() {
             if (m_right_elev_open) {
                 // Set the door back to closed for riding
                 m_right_elev_open = 0;
-                m_goal_yaw = m_curr_yaw - m_elevator_yaw;
+                m_goal_yaw = wrap_radians(m_curr_yaw - m_elevator_yaw);
                 m_prev_state = m_state;
                 m_state = turning;
             }
             else if (m_left_elev_open) {
                 m_left_elev_open = 0;
-                m_goal_yaw = m_curr_yaw + m_elevator_yaw;
+                m_goal_yaw = wrap_radians(m_curr_yaw + m_elevator_yaw);
                 m_prev_state = m_state;
                 m_state = turning;
             }
@@ -258,7 +258,7 @@ void FSM::enter_elevator() {
             m_cmd_vel.linear.x = m_elev_vel;
             cmd_vel_pub.publish(m_cmd_vel);
             ROS_INFO("Forward scan: %f", m_scan.at(256));
-            if (m_scan.at(256) < 0.5) {
+            if (m_scan.at(256) < 0.8) {
                 m_cmd_vel.linear.x = 0.0;
                 cmd_vel_pub.publish(m_cmd_vel);
                 m_motion_status++;
@@ -267,12 +267,13 @@ void FSM::enter_elevator() {
         case 4:
             ROS_INFO("Turn around");
             // rotate bot 180 to face the door
-            m_goal_yaw = m_curr_yaw + 3.14;
+            m_goal_yaw = wrap_radians(m_curr_yaw + 3.14);
             m_prev_state = m_state;
             m_state = turning;
             break;
         case 5:
             ROS_INFO("Finished entering elevator");
+            ros::Duration(7.0).sleep();
             m_motion_status = 0;
             m_state = riding_elevator;
             break;
@@ -295,8 +296,8 @@ void FSM::ride_elevator() {
     // Check for the doors opening
 
     // Constrain lidar scan to front
-    std::vector<float> mid_elev_scan(m_scan.begin()+170,
-            m_scan.begin()+341);
+    std::vector<float> mid_elev_scan(m_scan.begin()+215,
+            m_scan.begin()+300);
 
     // Find average distance on left and right sides of LaserScan
     float avg_mid_elev_scan = avg(mid_elev_scan);
@@ -329,7 +330,7 @@ void FSM::ride_elevator() {
  * return: the list of possible floor IDs that the robot could be at on 
  * elevator exit
  */
-FloorSet FSM::exit_elevator() {
+void FSM::exit_elevator() {
 
     // Publish m_state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
@@ -340,7 +341,7 @@ FloorSet FSM::exit_elevator() {
     m_cmd_vel.linear.x = m_elev_vel;
     cmd_vel_pub.publish(m_cmd_vel);
 
-    ros::Duration(1.0).sleep();
+    ros::Duration(2.0).sleep();
 
     m_cmd_vel.linear.x = 0;
     cmd_vel_pub.publish(m_cmd_vel);
@@ -376,24 +377,20 @@ void FSM::turn_pid() {
 
     ROS_INFO("Turning");
 
-    // Publish m_state to allow Sound Arduino to do it's thang
-    std_msgs::Int8 tmp = std_msgs::Int8();
-    tmp.data = 1;
-    audio_cmd_pub.publish(tmp);
-
-    float kp = 0.09;
-    float ki = 0.004;
-    float kd = 0.0;
+    float kp = 0.025; //0.09;
+    float ki = 0.02; //0.004;
+    float kd = 0.01; //0.0;
     float p_term;
     float i_term;
     float d_term;
-    float sum_error_max = .06;
+    float sum_error_max = 0.07;
     float yaw_thresh = 0.05; // in radians
 
-    // Use PID control to turn until close enough to the turn goal
-    if (abs(m_goal_yaw - m_curr_yaw) > yaw_thresh) {
+    m_curr_error = get_relative_diff_radians(m_curr_yaw, m_goal_yaw);
 
-        m_curr_error = get_relative_diff_radians(m_curr_yaw, m_goal_yaw);
+    // Use PID control to turn until close enough to the turn goal
+    if (abs(m_curr_error) > yaw_thresh) {
+
         m_sum_error += m_curr_error;
         m_diff_error = m_curr_error - m_prev_error;
 
@@ -411,6 +408,8 @@ void FSM::turn_pid() {
             m_ang_vel = m_elev_vel*-1;
         }
 
+        ROS_INFO("Current yaw: %f", m_curr_yaw);
+        ROS_INFO("Current goal: %f", m_goal_yaw);
         ROS_INFO("Current error: %f", m_curr_error);
         ROS_INFO("P term: %f", p_term);
         ROS_INFO("I term: %f", i_term);

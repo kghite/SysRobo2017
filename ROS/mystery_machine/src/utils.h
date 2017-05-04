@@ -72,8 +72,26 @@ float get_relative_diff_radians(float ang_1, float ang_2) {
     float diff;
     float relative_diff;
 
+    // The algorithm only works if ang_2 >= ang_1
+    uint8_t flip = 0;
+    if (ang_1 > ang_2) {
+
+        flip = 1;
+
+        float ang_1_copy = ang_1;
+        ang_1 = ang_2;
+        ang_2 = ang_1_copy;
+    }
+
+    // Calculate relative difference between the two angles
     diff = ang_2 - ang_1;
     relative_diff = fmod(diff + M_PI, 2*M_PI) - M_PI; // fmod is modulus
+
+    // If we swapped the values earlier to catch the special case where ang_1 > ang_2,
+    // then negative the relative_diff value now to make up for it
+    if (flip) {
+        relative_diff *= -1;
+    }
 
     return relative_diff;
 }
