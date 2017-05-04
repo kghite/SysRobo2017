@@ -12,10 +12,12 @@
  */
 float avg(std::vector <float> vec) {
 
+    // Initialize averaging variables
+    int num_elements = vec.size();
     float total = 0.0;
     float average = 0.0;
-    int num_elements = vec.size();
 
+    // Sum all values in the vector
     for (int i=0; i<num_elements; i++) {
         float curr_val = vec.at(i);
 
@@ -23,8 +25,97 @@ float avg(std::vector <float> vec) {
         if (isfinite(curr_val)) {
             total += curr_val;
         }
-}
+    }
+
+    // Normalize the total to get the average
     average = total / num_elements;
  
     return average;
+}
+
+
+/*
+ * Wrap an angle measurment (in radians) to be in the range 0 to 2pi
+ *
+ * angle: the angle that you want to wrap
+ *
+ * return: angle wrapped to the range 0 to 2pi
+ */
+float wrap_radians(float angle) {
+
+    while (angle >= 2*M_PI) {
+
+        angle -= 2*M_PI;
+    }
+
+    while (angle < 0) {
+
+        angle += 2*M_PI;
+    }
+
+    return angle;
+}
+
+
+/*
+ * Get a relative difference between two radian angles. The relative difference
+ * accounts for wrapping around the 2pi cutoff. The two input angles must be
+ * between 0 (inclusive) and 2pi (exclusive).
+ *
+ * ang_1: first angle to get relative diff of
+ * ang_2: second angle to get relative diff of
+ *
+ * return: the relative difference of ang_1 and ang_2
+ */
+float get_relative_diff_radians(float ang_1, float ang_2) {
+
+    float diff;
+    float relative_diff;
+
+    // The algorithm only works if ang_2 >= ang_1
+    uint8_t flip = 0;
+    if (ang_1 > ang_2) {
+
+        flip = 1;
+
+        float ang_1_copy = ang_1;
+        ang_1 = ang_2;
+        ang_2 = ang_1_copy;
+    }
+
+    // Calculate relative difference between the two angles
+    diff = ang_2 - ang_1;
+    relative_diff = fmod(diff + M_PI, 2*M_PI) - M_PI; // fmod is modulus
+
+    // If we swapped the values earlier to catch the special case where ang_1 > ang_2,
+    // then negative the relative_diff value now to make up for it
+    if (flip) {
+        relative_diff *= -1;
+    }
+
+    return relative_diff;
+}
+
+
+/*
+ * Clip a float to between a minimum and maximum value.
+ *
+ * val: the float value to clip
+ * min: the minimum value that val can be
+ * max: the maximum value that val can be
+ *
+ * return: val bounded between min and max
+ */
+float bound_float(float val, float min, float max) {
+
+    if (val < min) {
+
+        val = min;
+    }
+    else if (val > max) {
+
+        val = max;
+    }
+
+    return val;
 }

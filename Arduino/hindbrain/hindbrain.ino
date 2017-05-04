@@ -69,10 +69,10 @@ void cmd_vel_callback( const geometry_msgs::Twist& cmd_vel ) {
   angular_vel = int(90 * cmd_vel.angular.z);
   
   // Print the received Twist message
-//  debug_info = "Received Twist message!\n";
-//  debug_info += "Linear vel: " + String(linear_vel) + "\n";
-//  debug_info += "Angular vel: " + String(angular_vel);
-//  debug_print(debug_info);
+  String debug_info = "Received Twist message!\n";
+  debug_info += "Linear vel: " + String(linear_vel) + "\n";
+  debug_info += "Angular vel: " + String(angular_vel);
+  debug_print(debug_info);
 }
 ros::Subscriber<geometry_msgs::Twist> cmd_vel_sub("cmd_vel", &cmd_vel_callback );
 
