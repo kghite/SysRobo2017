@@ -17,7 +17,14 @@ For a more complete structuring of our electrical system, see the diagram below:
 
 #### Software Structure:
 
-The software structure consists of two parts.  The hindbrain runs on the Arduino and controls immediate reaction to fast inputs, such as perimeter sonar sensors (to allow emergency stopping before running into an unexpected obstacle or down stairs) and motor control. Communicating with the Arduino using rosserial, the Odroid runs the ROS Finite State Machine. The FSM, which you can see laid out in the diagram below, determines which state the robot is in, manages the transitions between states, and calls whichever scripts should be running to execute that state's mission. Any movement of the robot is piloted by whichever state it is in, and is sent over command velocity topics to the Arduino as the velocity output.
+The software structure consists of two parts. 
+
+The hindbrain runs on the Arduino and controls immediate reaction to fast inputs, such as perimeter sonar sensors (to allow emergency stopping before running into an unexpected obstacle or down stairs) and motor control.
+
+![Software Diagram](https://github.com/kghite/SysRobo2017/blob/master/software_diagram.png)
+
+
+Communicating with the Arduino using rosserial, the Odroid runs the Mission Control. This finite state machine, which you can see laid out in the diagram below, determines which state the robot is in, manages the transitions between states, and calls whichever scripts should be running to execute that state's mission. Any movement of the robot is piloted by whichever state it is in, and is sent over command velocity topics to the Arduino as the velocity output.
 
 ![Finite State Diagram](https://github.com/kghite/SysRobo2017/blob/master/finite_state_diagram_final.png)
 
