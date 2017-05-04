@@ -11,8 +11,20 @@ const int MAX_ENCODER_VAL = 32767;
 const int MIN_ENCODER_VAL = -32768;
 
 
+// ROS publishers
+std_msgs::Int16 left_encoder_msg;
+ros::Publisher left_encoder_pub("lwheel", &left_encoder_msg);
+
+std_msgs::Int16 right_encoder_msg;
+ros::Publisher right_encoder_pub("rwheel", &right_encoder_msg);
+
+
 // Setup process for encoders
 void setup_encoders() {
+  
+  // ROS publishers
+  nh.advertise(left_encoder_pub);
+  nh.advertise(right_encoder_pub);
     
   // Setup encoders and encoder interrupts
   pinMode(LEFT_ENCODER_PIN_A, INPUT);
@@ -41,7 +53,7 @@ void check_left_encoder() {
   
   if (left_encoder_updated) {
     left_encoder_msg.data = left_encoder_pos;
-    left_encoder_publisher.publish(&left_encoder_msg);
+    left_encoder_pub.publish(&left_encoder_msg);
     left_encoder_updated = false;
   }
 }
@@ -52,7 +64,7 @@ void check_right_encoder() {
   
   if (right_encoder_updated) {
     right_encoder_msg.data = right_encoder_pos;
-    right_encoder_publisher.publish(&right_encoder_msg);
+    right_encoder_pub.publish(&right_encoder_msg);
     right_encoder_updated = false;
   }
 }

@@ -7,33 +7,35 @@
  * exploration with the Mystery Machine  
 */
 
-#include "string"
-#include "list"
-#include "iostream"
-#include "math.h"
 
-#include "ros/ros.h"
+#include <string>
+#include <list>
+#include <iostream>
+#include <math.h>
 
-#include "geometry_msgs/Pose.h"
-#include "geometry_msgs/PoseStamped.h"
-#include "geometry_msgs/Twist.h"
-#include "nav_msgs/OccupancyGrid.h"
-#include "nav_msgs/Odometry.h"
-#include "sensor_msgs/LaserScan.h"
-#include "std_msgs/Int8.h"
-#include "std_msgs/Int16.h"
-#include "tf/transform_datatypes.h"
+#include <ros/ros.h>
+#include <geometry_msgs/Pose.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <geometry_msgs/Twist.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/Odometry.h>
+#include <sensor_msgs/LaserScan.h>
+#include <std_msgs/Int8.h>
+#include <std_msgs/Int16.h>
+#include <tf/transform_datatypes.h>
 
 #include <move_base_msgs/MoveBaseAction.h>
 #include <actionlib/client/simple_action_client.h>
 
+#include "utils.h"
+
+
 // Nav stack simple goals interface
-typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction> MoveBaseClient;
+typedef actionlib::SimpleActionClient<move_base_msgs::MoveBaseAction>
+        MoveBaseClient;
 move_base_msgs::MoveBaseGoal goal;
 
-int lastRock;
-
-// Set up state values
+// Set up m_state values
 enum State {
     exploring,				//
     finding_elevator,		//
@@ -46,11 +48,13 @@ enum State {
     matching_map			//
 };
 
+
 // This is received from the wormhole stack.
 struct Floor {
     int number;
     std::string id;
 };
+
 
 // This is received from the wormhole stack, also.
 struct FloorSet {
@@ -59,30 +63,26 @@ struct FloorSet {
     float probs[];
 };
 
-
 // declaring publishers
-ros::Publisher audio_pub;
+ros::Publisher audio_cmd_pub;
 ros::Publisher cmd_vel_pub;
 
 
 class FSM {
 
     public:  
-        State state;
-        float elev_vel;   // velocity parameter
+        State m_state;
+        float m_elev_vel;   // velocity parameter
 
-        // declaring scanResponse info
-        bool scan_changes;   // 0 = no change; 1 = changed
-        std::vector<float> scan_old;
-        std::vector<float> scan_new;
+        std::vector <float> m_scan;
 
-        // declaring odomResponse info
-        float dist_traveled;
-        float ang_traveled;
-        geometry_msgs::Point pos_old;
-        geometry_msgs::Point pos_new;
-        geometry_msgs::Quaternion quat_old;
-        geometry_msgs::Quaternion quat_new;
+        // declaring odom_callback info
+        float m_dist_traveled;
+        float m_ang_traveled;
+        geometry_msgs::Point m_pos_old;
+        geometry_msgs::Point m_pos_new;
+        geometry_msgs::Quaternion m_quat_old;
+        geometry_msgs::Quaternion m_quat_new;
 
         // declaring constructor for FSM, which takes arg 'ROS node handler'
         FSM(ros::NodeHandle n);
@@ -92,16 +92,14 @@ class FSM {
         geometry_msgs::Pose goal_pose;
         geometry_msgs::Twist cmd_vel;
         // nav_msgs::Odometry odom;
-        sensor_msgs::LaserScan scan;
         std_msgs::Int8 floor;
-
 
         // declaring methods
         float explore_floor();
         geometry_msgs::Pose find_elevator(nav_msgs::OccupancyGrid search_map);
         bool nav_to_elevator(geometry_msgs::Pose elevator_pose);
         FloorSet order_maps(std::string map_store_file, 
-                                std_msgs::Int8 direction);
+                std_msgs::Int8 direction);
         FloorSet elevator_interaction();
         void call_elevator();
         void enter_elevator();
@@ -110,17 +108,28 @@ class FSM {
         Floor match_map();
 
         // declaring callback methods
-        void scanResponse(sensor_msgs::LaserScan scan);
-        void odomResponse(nav_msgs::Odometry odom);
+        void scan_callback(sensor_msgs::LaserScan scan);
+        void odom_callback(nav_msgs::Odometry odom);
+
+    private:
+        // FSM::CallElevator
+        float m_closed_left_elev_scan_avg = 0.0;
+        float m_closed_right_elev_scan_avg = 0.0;
+        float m_elev_open_thresh = 0.2;
+        uint8_t m_left_elev_open = 0;
+        uint8_t m_right_elev_open = 0;
+        int8_t m_curr_pace_dir = -1;
 };
+
 
 /*
 * This is equivalnt to the init() method in python.
 */
 FSM::FSM(ros::NodeHandle n) {
-    elev_vel = 0.1;    // TODO: confirm this vel for elevator specifically
-    scan_changes = 0;
+    m_elev_vel = 0.1;    // TODO: confirm this vel for elevator specifically
+    m_scan = std::vector <float> (512, 0.0); // initialize scan
 }
+
 
 /* 
  * Runs gmapping to explore an unmapped floor to some percentage complete
@@ -131,6 +140,7 @@ FSM::FSM(ros::NodeHandle n) {
 float FSM::explore_floor() {
     // Gmapping integration
 }
+
 
 /* 
  * Finds an elevator in a given occupancy grid using an assumed shape
@@ -144,6 +154,7 @@ geometry_msgs::Pose FSM::find_elevator(nav_msgs::OccupancyGrid search_map) {
     // Find an elevator within a map
 }
 
+
 /* 
  * Navigate to an elevator given the given elevator pose
  *
@@ -155,6 +166,7 @@ bool FSM::nav_to_elevator(geometry_msgs::Pose elevator_pose) {
     // Go to an elevator loading position
     // Note that wpt must be positioned such that scan can detect both elevators
 }
+
 
 /* 
  * Determines the probabilities of floor orders for the current map set
@@ -169,31 +181,62 @@ FloorSet FSM::order_maps(std::string map_store_file,
     // Determine all possible map orders and return with a given likelihood
 }
 
+
 /* 
- * Provide HRI around calling elevator: Robot plays soundtrack while gently
- * rocking back and forth.
+ * Provide HRI around calling elevator: Robot plays soundtrack while waiting
+ * for one of the elevator doors to open
  */
 void FSM::call_elevator() {
 
+    ROS_INFO("Calling elevator.");
 
-    // Publish audio state
+    // Publish appropriate audio m_state
     std_msgs::Int8 tmp = std_msgs::Int8();
     tmp.data = 1;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
-    // Rock back and forth
-	  goal.target_pose.header.frame_id = "base_link";
-	  goal.target_pose.header.stamp = ros::Time::now();
+    // Split current LaserScan into left and right sides
+    std::vector<float> left_elev_scan(m_scan.begin()+256,
+            m_scan.begin()+511);
+    std::vector<float> right_elev_scan(m_scan.begin()+0,
+            m_scan.begin()+255);
 
-	  if (lastRock == 0) {
-	  		goal.target_pose.pose.position.x = 0.1;
-	  		lastRock = 1;
-	  }
-	  else {
-	  		goal.target_pose.pose.position.x = -0.1;
-	  		lastRock = 0;
-	  }
+    // Find average distance on left and right sides of LaserScan
+    float avg_left_elev_scan = avg(left_elev_scan);
+    float avg_right_elev_scan = avg(right_elev_scan);
+
+    // Debug print statements
+    ROS_INFO("Closed elev scan avg: %f", m_closed_right_elev_scan_avg);
+    ROS_INFO("Avg right elevator scan: %f", avg_left_elev_scan);
+
+    // If a baseline for what the LaserScan looks like when the elevators are
+    // closed has not been defined, then define it
+    if (m_closed_left_elev_scan_avg == 0.0 &&
+            m_closed_right_elev_scan_avg == 0.0) {
+
+        m_closed_left_elev_scan_avg = avg_left_elev_scan;
+        m_closed_right_elev_scan_avg = avg_right_elev_scan;
+    }
+
+    // If the left elevator door opened
+    if (avg_left_elev_scan - m_closed_left_elev_scan_avg >=
+            m_elev_open_thresh) {
+
+        ROS_INFO("Left elevator opened.");
+        m_left_elev_open = 1;
+        m_state = entering_elevator;
+    }
+
+    // If the right elevator door opened
+    else if (avg_right_elev_scan - m_closed_right_elev_scan_avg >=
+            m_elev_open_thresh) {
+
+        ROS_INFO("Right elevator opened.");
+        m_right_elev_open = 1;
+        m_state = entering_elevator;
+    }
 }
+
 
 /* 
  * Provide HRI around entering elevator.
@@ -205,54 +248,55 @@ void FSM::enter_elevator() {
     // Wait for passengers to fully exit elevator
     sleep(3);
 
-    // Publish state to allow Sound Arduino to do it's thang
+    // Publish m_state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
-    // tmp.data = state;
     tmp.data = 2;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Enter elevator slowly
     // TODO: how to set wpt to elevator???  @Katie
     // TODO: confirm this velocity
-    cmd_vel.linear.y = FSM::elev_vel;
+    cmd_vel.linear.y = FSM::m_elev_vel;
     cmd_vel_pub.publish(cmd_vel);
 
     // Once 1m from elevator’s back wall: stop and rotate 180 to face elevator doors
-    if (scan.ranges[256] < 1) {
+    if (m_scan.at(256) < 1) {
         // stop moving forward when we are < 1m from elevator's back wall
         cmd_vel.linear.y = 0;
         cmd_vel_pub.publish(cmd_vel);
 
         // rotate bot
-        cmd_vel.angular.z = FSM::elev_vel;   // TODO: confirm this velocity
+        cmd_vel.angular.z = FSM::m_elev_vel;   // TODO: confirm this velocity
         cmd_vel_pub.publish(cmd_vel);
 
         // stop rotating once we've gone 180
-        if (FSM::ang_traveled == M_PI or FSM::ang_traveled == -M_PI) {
+        if (FSM::m_ang_traveled == M_PI or FSM::m_ang_traveled == -M_PI) {
          cmd_vel.angular.z = 0;
          cmd_vel_pub.publish(cmd_vel);
         }
     }
 
-    if (FSM::scan_changes == 0) {
-        FSM::state = riding_elevator;
-    }
+    //if (FSM::scan_changes == 0) {
+        //FSM::m_state = riding_elevator;
+    //}
 }
+
 
 /* 
  * Provide HRI around riding elevator.
  */
 void FSM::ride_elevator() {
-    // Publish state to allow Sound Arduino to do it's thang
+    // Publish m_state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
-    // tmp.data = state;
+    // tmp.data = m_state;
     tmp.data = 3;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
-    if (FSM::scan_changes == 0) {
-        FSM::state = exiting_elevator;
-    }
+    //if (FSM::scan_changes == 0) {
+        //FSM::m_state = exiting_elevator;
+    //}
 }
+
 
  /*
  * Provide HRI around exiting elevator.
@@ -262,29 +306,29 @@ void FSM::ride_elevator() {
  */
 FloorSet FSM::exit_elevator() {
 
-    // Publish state to allow Sound Arduino to do it's thang
+    // Publish m_state to allow Sound Arduino to do it's thang
     std_msgs::Int8 tmp = std_msgs::Int8();
-    // tmp.data = state;
+    // tmp.data = m_state;
     tmp.data = 4;
-    audio_pub.publish(tmp);
+    audio_cmd_pub.publish(tmp);
 
     // Exit elevator by moving forward slowly
     // TODO: confirm this velocity
-    cmd_vel.linear.y = FSM::elev_vel;
+    cmd_vel.linear.y = FSM::m_elev_vel;
     cmd_vel_pub.publish(cmd_vel);
 
     // Once bot has exited elevator, stop
-    float y_dist_traveled = abs(FSM::pos_new.y - FSM::pos_old.y);
-    if (y_dist_traveled > 2) {
+    float y_m_dist_traveled = abs(FSM::m_pos_new.y - FSM::m_pos_old.y);
+    if (y_m_dist_traveled > 2) {
         cmd_vel.linear.y = 0;
         cmd_vel_pub.publish(cmd_vel);
     }
 
     // TODO: Map matching behavior goes here.
 
-    // TODO: write trigger for next state
+    // TODO: write trigger for next m_state
     // if (FSM::scan_changes == 0) {
-    //     FSM::state = ride_elevator();
+    //     FSM::m_state = ride_elevator();
     // }
 
 }
@@ -300,148 +344,143 @@ Floor FSM::match_map() {
 
 }
 
-void FSM::scanResponse(const sensor_msgs::LaserScan scan) {
 
-    // set incoming data to object's scan_new attr
-    FSM::scan_new = scan.ranges;
+void FSM::scan_callback(const sensor_msgs::LaserScan msg) {
 
-    // compare to scan_old, setting bool scan_changes appropriately
-    if (FSM::scan_new == FSM::scan_old) {
-        FSM::scan_changes = 1;
-    } else {
-        FSM::scan_changes = 0;
-    }
-
-    // set scan_new to scan_old
-    FSM::scan_old = FSM::scan_new;
+    m_scan = msg.ranges;
 }
 
-void FSM::odomResponse(const nav_msgs::Odometry odom) {
+
+void FSM::odom_callback(const nav_msgs::Odometry odom) {
 
     // set incoming data to object's new attrs
-    FSM::pos_new = odom.pose.pose.position;
-    FSM::quat_new = odom.pose.pose.orientation;
+    FSM::m_pos_new = odom.pose.pose.position;
+    FSM::m_quat_new = odom.pose.pose.orientation;
 
     // calculate distance traveled
-    float x_diff = FSM::pos_new.x - FSM::pos_old.x;
-    float y_diff = FSM::pos_new.y - FSM::pos_old.y;
-    FSM::dist_traveled = sqrt(pow(x_diff, 2) + pow(y_diff, 2));
+    float x_diff = FSM::m_pos_new.x - FSM::m_pos_old.x;
+    float y_diff = FSM::m_pos_new.y - FSM::m_pos_old.y;
+    FSM::m_dist_traveled = sqrt(pow(x_diff, 2) + pow(y_diff, 2));
 
-    
     // get yaws
-    float yaw_new = (float)tf::getYaw(FSM::quat_new);
-    float yaw_old = (float)tf::getYaw(FSM::quat_old);
+    float yaw_new = (float)tf::getYaw(FSM::m_quat_new);
+    float yaw_old = (float)tf::getYaw(FSM::m_quat_old);
 
     // force yaws to always be within range [-pi, pi]
     // see wrapPi(): 
-    //    https://github.com/ManickYoj/warmup_project_2017/blob/master/scripts/utils.py
+    //    https://github.com/ManickYoj/warmup_project_2017/blob/master/
+    //                  scripts/utils.py
     float pi_yn = atan2(sin(yaw_new), cos(yaw_new));
     float pi_yo = atan2(sin(yaw_old), cos(yaw_old));
 
     // calculate angle rotated
     // see diffAngle():
-    //    https://github.com/ManickYoj/warmup_project_2017/blob/master/scripts/utils.py
+    //    https://github.com/ManickYoj/warmup_project_2017/blob/master/
+    //                  scripts/utils.py
     float d1 = pi_yn - pi_yo;
     float d2 = 2*M_PI - abs(d1);
     if (d1 > 0) d2 = d2 * -1.0;
-    if (abs(d1) < abs(d2)) FSM::ang_traveled = d1;
-    else FSM::ang_traveled = d2;
+    if (abs(d1) < abs(d2)) FSM::m_ang_traveled = d1;
+    else FSM::m_ang_traveled = d2;
 
     // set pose_new to old attrs
-    FSM::pos_old = FSM::pos_new;
-    FSM::quat_old = FSM::quat_new;
-
+    FSM::m_pos_old = FSM::m_pos_new;
+    FSM::m_quat_old = FSM::m_quat_new;
 }
 
 
 int main(int argc, char **argv) {
+
     ros::init(argc, argv, "mission_control");
     ros::NodeHandle n;
-    ros::Rate loop_rate(10);
+    ros::Rate r(10);
 
     ROS_INFO("main");
 
-    // Init mission controller to first state on ground floor
+    // Init mission controller to first m_state on ground floor
     FSM mission_controller(n);   // init FSM
-    mission_controller.state = calling_elevator;
+    mission_controller.m_state = calling_elevator;
     mission_controller.floor.data = 1;
 
     // Publishers
-    audio_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
+    audio_cmd_pub = n.advertise<std_msgs::Int8>("/audio_cmd", 1000);
     cmd_vel_pub = n.advertise<geometry_msgs::Twist>("/cmd_vel", 1000);
 
-	  // Subscribers
-    ros::Subscriber sub_scan = n.subscribe("/scan", 1000, &FSM::scanResponse, &mission_controller);
-    ros::Subscriber sub_odom = n.subscribe("/odom", 1000, &FSM::odomResponse, &mission_controller);
+    // Subscribers
+    ros::Subscriber scan_sub = n.subscribe("/scan", 1000, &FSM::scan_callback,
+            &mission_controller);
+    ros::Subscriber odom_sub = n.subscribe("/odom", 1000, &FSM::odom_callback,
+            &mission_controller);
 
-		MoveBaseClient ac("move_base", true);
+    //MoveBaseClient ac("move_base", true);
 
-	  // Move base server
-	  while(!ac.waitForServer(ros::Duration(5.0))){
-	    ROS_INFO("Waiting for the move_base action server to come up");
-	  }
-
-	  int lastRock = 0;
+    // Move base server
+    //while(!ac.waitForServer(ros::Duration(5.0))) {
+        //ROS_INFO("Waiting for the move_base action server to come up");
+    //}
 
     while (ros::ok()) {
 
-        if (mission_controller.state == calling_elevator) {
-        	mission_controller.call_elevator();
+        if (mission_controller.m_state == calling_elevator) {
+
+            mission_controller.call_elevator();
         }
 
-        // // switch based on FSM case
-        // switch(mission_controller.state) {
-        //     // case exploring:
-        //     //     mission_controller.explore_floor();
-        //     //     break;
+        // switch based on FSM case
+        //switch(mission_controller.m_state) {
+            //case exploring:
+                //mission_controller.explore_floor();
+                //break;
 
-        //     // case finding_elevator:
-        //     //     mission_controller.find_elevator();
-        //     //     break;
+            ////case finding_elevator:
+                ////mission_controller.find_elevator();
+                ////break;
 
-        //     // case naving_to_elevator:
-        //     //     mission_controller.nav_to_elevator();
-        //     //     break;
+            ////case naving_to_elevator:
+                ////mission_controller.nav_to_elevator();
+                ////break;
 
-        //     // case ordering_maps:
-        //     //     mission_controller.order_maps();
-        //     //     break;
+            ////case ordering_maps:
+                ////mission_controller.order_maps();
+                ////break;
 
-        //     case calling_elevator:
-        //         mission_controller.call_elevator();
-        //         break;
+            //case calling_elevator:
+                //mission_controller.call_elevator();
+                //break;
 
-        //     case entering_elevator:
-        //         mission_controller.enter_elevator();
-        //         break;
+            //case entering_elevator:
+                //mission_controller.enter_elevator();
+                //break;
 
-        //     case riding_elevator:
-        //         mission_controller.ride_elevator();
-        //         break;
+            //case riding_elevator:
+                //mission_controller.ride_elevator();
+                //break;
 
-        //     case exiting_elevator:
-        //         mission_controller.exit_elevator();
-        //         break;
+            //case exiting_elevator:
+                //mission_controller.exit_elevator();
+                //break;
 
-        //     // case matching_map:
-        //     //     mission_controller.match_map();
-        //     //     break;
+            //case matching_map:
+                //mission_controller.match_map();
+                //break;
 
-        //     default:
-        //         break;
-        // }
+            //default:
+                //break;
+        //}
 
-        ROS_INFO("Sending goal");
-	  		ac.sendGoal(goal);
+        //ROS_INFO("Sending goal");
+        //ac.sendGoal(goal);
 
-	  		ac.waitForResult();
+        //ac.waitForResult();
 
-	  		if(ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED)
-	    			ROS_INFO("Move succeeded");
-	  		else
-	    			ROS_INFO("Move failed");
+        //if (ac.getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+            //ROS_INFO("Move succeeded");
+        //}
+        //else {
+            //ROS_INFO("Move failed");
+        //}
 
-        loop_rate.sleep();
+        r.sleep();
         ros::spinOnce();
     }
 
