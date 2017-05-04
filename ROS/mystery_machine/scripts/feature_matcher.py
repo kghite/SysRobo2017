@@ -43,45 +43,52 @@ class Feature_Matcher():
         #map_image = self.last_map
 
         if self.elevators is None:
-            print 'Elevators are None. NOT MATCHING FEATURES. (Are you in the right subdirectory?)'
+            print 'Elevators are None. NOT MATCHING FEATURES. (Are you in ROS/mystery_machine/scripts?)'
             return
         if self.last_map is None is None:
             print 'Elevators are good, last map is None. NOT MATCHING FEATURES'
             return
 
-        print 'matching features'
         map_image = cv2.imread(self.map_path,0)
         elevator_image = self.elevators
 
-        res = cv2.matchTemplate(map_image,elevator_image,eval('cv2.TM_CCOEFF'))
+        res = cv2.matchTemplate(map_image,elevator_image,eval('cv2.TM_CCOEFF_NORMED'))
 
         min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
         top_left = max_loc #top left of where it's recognizing an elevator it's the "max location" coming out of the cv2 function
-        confidence = max_val
+        confidence = max_val*100 #find confidence in prediction as a percentage from 0-100
+        print 'confidence: ',confidence
+
+        w,h = elevator_image.shape[::-1]
+        middle_of_elevator = [top_left[0]+w/2, top_left[1]+h/2]
 
         if self.test==True: #print picture things for debugging!
             w,h = elevator_image.shape[::-1]
             test_img = map_image.copy()
             bottom_right = (top_left[0] + w, top_left[1] + h)
-            cv2.rectangle(test_img,top_left, bottom_right, 255, 2)
-            plt.subplot(121),plt.imshow(res,cmap = 'gray')
-            plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
-            plt.subplot(122),plt.imshow(test_img,cmap = 'gray')
-            plt.title('Detected Point'), plt.xticks([]), plt.yticks([])
-            plt.suptitle('Testing!\n To zoom in, use Zoom To Rectangle Tool')
+            cv2.rectangle(test_img, top_left, bottom_right, 255, 2)
+            cv2.circle(test_img, (middle_of_elevator[0], middle_of_elevator[1]), 3, (255,0,0), -1)
+            crop_img = test_img[top_left[1]-h*3:top_left[1]+h*3, top_left[0]-w*3:top_left[0]+w*3]
+            # plt.subplot(121),plt.imshow(res,cmap = 'gray')
+            # plt.title('Matching Result'), plt.xticks([]), plt.yticks([])
+            # plt.subplot(122)
+            plt.imshow(crop_img,cmap = 'gray')
+            plt.title('Detected Elevator!'), plt.xticks([]), plt.yticks([])
+            # plt.suptitle('Testing!\n To zoom in, use Zoom To Rectangle Tool')
             plt.show()
         #create new blank array
         newgridarr = np.zeros(self.map_width*self.map_height)
         #make corresponding value 100% chance of occupancy
         newgridarr[top_left[0]*top_left[1]] = 100
+
         #make occupancy grid.
         newgrid = OccupancyGrid()
         newgrid.info.width = self.map_width
         newgrid.info.height = self.map_height
         newgrid.data = newgridarr
 
-        #TODO: CONFIDENCE NUMBERS ARE WEIRD. Either scale them or adjust this threshhold
-        if confidence > 60: #only publish if confidence is high
+        if confidence > 70: #only publish if confidence is higher than 70%
+            print 'MAP PUBLISHED'
             self.map_pub.publish(newgrid)
 
 
@@ -98,7 +105,7 @@ class Feature_Matcher():
         #threshold to 0s and 1s
         binary_np = stats.threshold(stats.threshold(np_arr,0,101,0),0,1,255)
         self.last_map = cv2.imwrite(self.map_path,binary_np)
-        print 'RECEIVED'
+        print 'Map Received. Matching Features.'
         #initiate feature matching. Whenever you receive a map, find elevators!
         self.match_features()
 
