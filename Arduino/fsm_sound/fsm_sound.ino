@@ -14,11 +14,12 @@ SdFat sd;
 SFEMP3Shield MP3player;
 int16_t last_ms_char;
 int8_t buffer_pos;
+uint8_t const SS_PIN = 9;
 
 // Reading audio state from digital pins
-const int AUDIO_STATE_READ_PIN_1 = 5;
-const int AUDIO_STATE_READ_PIN_2 = 12;
-const int AUDIO_STATE_READ_PIN_4 = 11;
+const int AUDIO_STATE_READ_PIN_1 = A0;
+const int AUDIO_STATE_READ_PIN_2 = A1;
+const int AUDIO_STATE_READ_PIN_4 = A2;
 uint8_t audio_state_read_1 = 0;
 uint8_t audio_state_read_2 = 0;
 uint8_t audio_state_read_4 = 0;
@@ -41,22 +42,23 @@ char buffer[6]; // 0-35K+null
 
 void setup() {
 
-  //uint8_t result; //result code from some function as to be tested at later time.
+  uint8_t result; //result code from some function as to be tested at later time.
 
   Serial.begin(115200);
-//  Serial.begin(9600);
+
+  pinMode(9, OUTPUT);
 
   pinMode(AUDIO_STATE_READ_PIN_1, INPUT);
   pinMode(AUDIO_STATE_READ_PIN_2, INPUT);
   pinMode(AUDIO_STATE_READ_PIN_4, INPUT);
 
-  //if(!sd.begin(SD_SEL, SPI_FULL_SPEED)) sd.initErrorHalt();  //Initialize the SdCard.
-  //if(!sd.chdir("/")) sd.errorHalt("sd.chdir");               // depending upon your SdCard environment, SPI_HAVE_SPEED may work better.
+  if(!sd.begin(SD_SEL, SPI_FULL_SPEED)) sd.initErrorHalt();  //Initialize the SdCard.
+  if(!sd.chdir("/")) sd.errorHalt("sd.chdir");               // depending upon your SdCard environment, SPI_HAVE_SPEED may work better.
 
-  //result = MP3player.begin();  //Initialize the MP3 Player Shield
+  result = MP3player.begin();  //Initialize the MP3 Player Shield
 
-  //last_ms_char = millis();  // stroke the inter character timeout.
-  //buffer_pos = 0;           // start the command string at zero length.
+  last_ms_char = millis();  // stroke the inter character timeout.
+  buffer_pos = 0;           // start the command string at zero length.
 
 }
 
@@ -65,13 +67,24 @@ void setup() {
  * SPINNNYYY
  */
 void loop() {
-  
+
   update_state();
-  
-  //play_state_audio();
-  
   delay(100);
 }
+
+//------------------------------------------------------------------------------
+/*
+ * Maps analog in to a particular state.
+ *
+ * State    Audio Index    Audio Clip
+ * -----    -----------    ----------
+ * 0        4              Never Gonna Give You Up
+ * 0        5              jazzy elev music
+ * 0        6              Scooby theme song
+ * 1        1              "hello. can you pls call elev for me?"
+ * 2        2              "entering elev. pls stand clear."
+ * 3        3              "exiting elev. pls stand clear."
+*/
 
 void update_state() {
 
@@ -83,27 +96,25 @@ void update_state() {
   // Read digital values like a binary number
   prev_audio_state = curr_audio_state;
   curr_audio_state = (audio_state_read_4 * 4) + (audio_state_read_2 * 2) + (audio_state_read_1 * 1);
-  
-  Serial.print("Estimated state: ");
+
+  // curr_audio_state = random(0,4);
+  Serial.print("State: ");
   Serial.println(curr_audio_state);
-  
-  Serial.println("");
+  if (curr_audio_state == 0) Serial.println(" music");
+  else if (curr_audio_state == 1) Serial.println(" calling");
+  else if (curr_audio_state == 2) Serial.println(" entering");
+  else if (curr_audio_state == 3) Serial.println(" exiting");
+
+  if (curr_audio_state != prev_audio_state) {
+    play_state_audio();
+  }
+
 }
 
 
 //------------------------------------------------------------------------------
 /*
- * Bot state subscriber callback: Mapping the robot's state to the appropriate 
- * audio clip.
- * 
- * Index    Filename        State(str)     Action                   Audio Clip
- * -----    --------        ---------      ---------                ----------
- * 00001    TRACK004.mp3    0: within      playing elev music       Never Gonna Give You Up
- * 00002    TRACK001.mp3    1: asking      requesting aid @ elev    "Hello. Can you pls call elev for me?"
- * 00003    TRACK002.mp3    2: entering    entering elev            "Entering elevator; pls stand clear."
- * 00004    TRACK003.mp3    3: exiting     exiting elev             "Exiting elevator; pls stand clear."
- * 00005    TRACK005.mp3    0: within      playing elev music       generic elevator music
- * 00006    TRACK006.mp3    0: within      playing elev music       Scooby Doo theme song
+ * TO-DO: Docstring needed.
  */
 void play_state_audio() {
 
@@ -113,34 +124,40 @@ void play_state_audio() {
   // Convert state to appropriate audio index.
   if (curr_audio_state != prev_audio_state) {
     Serial.println("New audio state!");
-    switch (curr_audio_state) {
-      case 1: // calling the elevator
-        audio_index = '00002';
-        break;
-      case 2: // entering the elevator
-        audio_index = '00003';
-        break;
-      case 3: // exiting the elevator
-        audio_index = '00004';
-        break;
-      case 0: // inside the elevator
-        track_val = random(0,2);
-        switch (track_val) {
-          case 0:
-            audio_index = '00001';
-            break;
-          case 1:
-            audio_index = '00005';
-            break;
-          case 2:
-            audio_index = '00006';
-            break;
-        }
-        break;
-    }
+    parse_menu('s');
   }
+    
+  switch (curr_audio_state) {
+    case 1: // calling the elevator
+      audio_index = '00001';
+      break;
+    case 2: // entering the elevator
+      audio_index = '00002';
+      break;
+    case 3: // exiting the elevator
+      audio_index = '00003';
+      break;
+    case 0: // inside the elevator
+      track_val = random(0,3);
+      switch (track_val) {
+        case 0:
+          audio_index = '00004';
+          break;
+        case 1:
+          audio_index = '00005';
+          break;
+        case 2:
+          audio_index = '00006';
+          break;
+      }
+      break;
+  }    
 
+  Serial.print("Audio index: ");
+  Serial.println(audio_index);
+  
   parse_menu(audio_index);    // Send audio_index to parse_menu() to play appropriate track.
+  Serial.println("");
 
   delay(100);
   
