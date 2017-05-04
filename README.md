@@ -1,4 +1,4 @@
-# RoboSys2017
+# RoboSys2017:
 Code base for the Mystery Machine autonomous exploration vehicle
 
 
@@ -150,3 +150,12 @@ To start the imu feed run:
 To start the camera feed run:
 
 `rosrun uvc_camera uvc_camera_node _device:=<CAMERA_PORT`
+
+## The Team
+
+We're the Scooby Gang! In real life, we're the team of five students at Olin who worked on this semester-long SysRobo project in spring 2017. We are:
+- [Katie Hite](https://github.com/kghite)
+- [Shane Kelly](https://github.com/shanek21)
+- [Liani Lye](https://github.com/lianilychee)
+- [Lauren Gulland](https://github.com/laurengulland)
+- [Arpan Rau](https://github.com/arpanrau)
